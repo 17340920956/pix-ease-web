@@ -1,0 +1,295 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  User,
+  LogOut,
+  Settings,
+  X,
+  Check,
+  Mail,
+  Phone,
+} from 'lucide-react';
+import { useAuthStore } from '@/store/useAuthStore';
+
+/**
+ * 用户信息展示与编辑组件
+ * 包含用户信息展示和编辑功能（无头像）
+ */
+export default function UserProfile() {
+  const { user, updateUser, logout } = useAuthStore();
+  const [isOpen, setIsOpen] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 编辑表单状态
+  const [editForm, setEditForm] = useState({
+    nickname: user?.nickname || '',
+    phone: user?.phone || '',
+  });
+
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // 同步编辑表单
+  useEffect(() => {
+    if (user) {
+      setEditForm({
+        nickname: user.nickname || '',
+        phone: user.phone || '',
+      });
+    }
+  }, [user, showEditModal]);
+
+  if (!user) return null;
+
+  const displayName = user.nickname || user.username || '用户';
+
+  /**
+   * 保存用户信息
+   */
+  const handleSave = () => {
+    updateUser({
+      nickname: editForm.nickname.trim() || undefined,
+      phone: editForm.phone.trim() || undefined,
+    });
+    setShowEditModal(false);
+  };
+
+  return (
+    <>
+      {/* 用户信息按钮 - 无头像 */}
+      <div className="relative" ref={dropdownRef}>
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors"
+          style={{ backgroundColor: 'var(--button-bg)' }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)';
+          }}
+        >
+          <User className="w-4 h-4" style={{ color: 'var(--primary)' }} />
+          <span className="text-sm font-medium hidden sm:inline max-w-[80px] truncate"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {displayName}
+          </span>
+        </button>
+
+        {/* 下拉菜单 */}
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute right-0 mt-2 w-64 rounded-2xl overflow-hidden z-50"
+              style={{
+                backgroundColor: 'var(--glass-bg)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid var(--glass-border)',
+                boxShadow: 'var(--glass-shadow)',
+              }}
+            >
+              {/* 用户信息头部 - 无头像 */}
+              <div className="p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {displayName}
+                </p>
+                <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {user.email}
+                </p>
+              </div>
+
+              {/* 菜单项 */}
+              <div className="p-2 space-y-1">
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setShowEditModal(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                  }}
+                >
+                  <Settings className="w-4 h-4" />
+                  个人设置
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors"
+                  style={{ color: 'var(--danger)' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <LogOut className="w-4 h-4" />
+                  退出登录
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* 编辑弹窗 - 无头像 */}
+      <AnimatePresence>
+        {showEditModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setShowEditModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md rounded-2xl p-6 space-y-6"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid var(--glass-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 弹窗头部 */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                  个人设置
+                </h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* 表单字段 */}
+              <div className="space-y-4">
+                {/* 昵称 */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    <User className="w-4 h-4" />
+                    昵称
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.nickname}
+                    onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })}
+                    placeholder="设置你的昵称"
+                    className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--input-border)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+
+                {/* 邮箱（只读） */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    <Mail className="w-4 h-4" />
+                    邮箱
+                  </label>
+                  <input
+                    type="email"
+                    value={user.email}
+                    disabled
+                    className="w-full px-3 py-2.5 rounded-xl text-sm cursor-not-allowed"
+                    style={{
+                      backgroundColor: 'var(--button-bg)',
+                      border: '1px solid var(--input-border)',
+                      color: 'var(--text-muted)',
+                    }}
+                  />
+                </div>
+
+                {/* 手机号 */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    <Phone className="w-4 h-4" />
+                    手机号
+                  </label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="绑定手机号"
+                    className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none transition-colors"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--input-border)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
+
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                  style={{
+                    backgroundColor: 'var(--button-bg)',
+                    color: 'var(--text-secondary)',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)'; }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors flex items-center justify-center gap-2"
+                  style={{ backgroundColor: 'var(--primary)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.9'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+                >
+                  <Check className="w-4 h-4" />
+                  保存
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}

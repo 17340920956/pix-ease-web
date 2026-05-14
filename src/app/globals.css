@@ -1,26 +1,355 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ==========================================
+   Apple Design System - Color Tokens
+   ========================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Background */
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+
+  /* Apple Blue */
+  --primary: #0071e3;
+  --primary-hover: #0077ed;
+  --primary-light: rgba(0, 113, 227, 0.1);
+
+  /* Text Colors */
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-muted: #a1a1a6;
+  --text-tertiary: #d2d2d7;
+
+  /* Surface Colors */
+  --surface: #ffffff;
+  --surface-secondary: #f5f5f7;
+  --surface-elevated: #ffffff;
+
+  /* Glass Effect */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+
+  /* Card */
+  --card-bg: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.04);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+
+  /* Input */
+  --input-bg: #ffffff;
+  --input-border: #d2d2d7;
+  --input-focus: #0071e3;
+
+  /* Semantic Colors */
+  --danger: #ff3b30;
+  --success: #34c759;
+  --warning: #ff9500;
+  --info: #0071e3;
+
+  /* Scrollbar */
+  --scrollbar-color: rgba(0, 0, 0, 0.15);
 }
 
+/* Dark Mode - Apple Style */
+[data-theme="dark"] {
+  --background: #000000;
+  --foreground: #f5f5f7;
+
+  --primary: #0a84ff;
+  --primary-hover: #409cff;
+  --primary-light: rgba(10, 132, 255, 0.15);
+
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-muted: #6e6e73;
+  --text-tertiary: #38383a;
+
+  --surface: #1c1c1e;
+  --surface-secondary: #2c2c2e;
+  --surface-elevated: #1c1c1e;
+
+  --glass-bg: rgba(28, 28, 30, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --card-bg: #1c1c1e;
+  --card-border: rgba(255, 255, 255, 0.06);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+
+  --input-bg: #1c1c1e;
+  --input-border: #38383a;
+  --input-focus: #0a84ff;
+
+  --danger: #ff453a;
+  --success: #30d158;
+  --warning: #ff9f0a;
+  --info: #0a84ff;
+
+  --scrollbar-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Eye Care Mode */
+[data-theme="eye-care"] {
+  --background: #f5f0e1;
+  --foreground: #3d3d3d;
+
+  --primary: #5a8f5a;
+  --primary-hover: #4a7a4a;
+  --primary-light: rgba(90, 143, 90, 0.1);
+
+  --text-primary: #3d3d3d;
+  --text-secondary: #7a8a6a;
+  --text-muted: #9a9a8a;
+  --text-tertiary: #c8beaa;
+
+  --surface: #faf7f0;
+  --surface-secondary: #f0ebe0;
+  --surface-elevated: #faf7f0;
+
+  --glass-bg: rgba(250, 247, 240, 0.72);
+  --glass-border: rgba(200, 190, 170, 0.4);
+  --glass-shadow: 0 8px 32px rgba(100, 90, 70, 0.1);
+
+  --card-bg: #faf7f0;
+  --card-border: rgba(200, 190, 170, 0.3);
+  --card-shadow: 0 4px 16px rgba(100, 90, 70, 0.06);
+
+  --input-bg: #faf7f0;
+  --input-border: #c8beaa;
+  --input-focus: #5a8f5a;
+
+  --danger: #c45c5c;
+  --success: #5a9a5a;
+  --warning: #c49a3a;
+  --info: #5a8a9a;
+
+  --scrollbar-color: rgba(100, 90, 70, 0.25);
+}
+
+/* ==========================================
+   Tailwind Theme Integration
+   ========================================== */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ==========================================
+   Base Styles
+   ========================================== */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================
+   Apple Glass Effect
+   ========================================== */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Strong glass for cards */
+.glass-strong {
+  background: var(--card-bg);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+/* ==========================================
+   Apple Background System
+   ========================================== */
+.gradient-bg {
+  background: var(--background);
+  position: relative;
+  min-height: 100vh;
+}
+
+/* ==========================================
+   Apple Button Styles
+   ========================================== */
+.btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  border-radius: 980px;
+  padding: 12px 28px;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25);
+}
+
+.btn-secondary {
+  background: var(--surface-secondary);
+  color: var(--primary);
+  border-radius: 980px;
+  padding: 12px 28px;
+  font-weight: 500;
+  font-size: 15px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-secondary:hover {
+  background: var(--primary-light);
+}
+
+/* ==========================================
+   Apple Card Styles
+   ========================================== */
+.card-apple {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-apple:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .card-apple:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================
+   Apple Input Styles
+   ========================================== */
+.input-apple {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 16px;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.input-apple::placeholder {
+  color: var(--text-muted);
+}
+
+.input-apple:focus {
+  outline: none;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 4px var(--primary-light);
+}
+
+/* ==========================================
+   Apple Navigation
+   ========================================== */
+.nav-apple {
+  background: var(--glass-bg);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* ==========================================
+   Text Color Overrides for Dark Mode
+   ========================================== */
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-slate-900 {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .text-slate-700 {
+  color: #e8e8ed;
+}
+
+[data-theme="dark"] .text-slate-600 {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .text-slate-500,
+[data-theme="dark"] .text-slate-400 {
+  color: var(--text-muted);
+}
+
+/* ==========================================
+   Animations
+   ========================================== */
+.animate-fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* ==========================================
+   Scrollbar
+   ========================================== */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-color) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-color);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--primary);
 }
