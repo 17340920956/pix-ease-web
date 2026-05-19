@@ -1,7 +1,10 @@
 'use client';
 
 import { memo } from 'react';
+import { motion } from 'framer-motion';
 import { Plus, Trash2, Copy, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+
+const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 interface FrameData {
   id: string;
@@ -43,43 +46,55 @@ export default memo(function FramePanel({
           帧 ({frames.length})
         </span>
         <div className="flex items-center gap-1">
-          <button
+          <motion.button
             onClick={onAddFrame}
+            whileHover={{ scale: 1.12 }}
+            whileTap={{ scale: 0.9 }}
+            transition={springFast}
             className="p-1 rounded transition-colors"
             style={{ color: 'var(--text-secondary)' }}
             title="添加帧"
           >
             <Plus className="w-3.5 h-3.5" />
-          </button>
+          </motion.button>
         </div>
       </div>
 
       {frames.length > 0 && (
         <>
           <div className="flex items-center justify-center gap-2 py-1">
-            <button
+            <motion.button
               onClick={() => onSelectFrame(Math.max(0, currentFrameIndex - 1))}
               disabled={currentFrameIndex === 0}
-              className="p-1 rounded disabled:opacity-30"
+              whileHover={{ scale: currentFrameIndex === 0 ? 1 : 1.12 }}
+              whileTap={{ scale: currentFrameIndex === 0 ? 1 : 0.9 }}
+              transition={springFast}
+              className="p-1 rounded disabled:opacity-30 transition-colors"
               style={{ color: 'var(--text-secondary)' }}
             >
               <SkipBack className="w-3.5 h-3.5" />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={onTogglePlayback}
-              className="p-1.5 rounded-full"
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.88 }}
+              transition={springFast}
+              className="p-1.5 rounded-full transition-colors"
               style={{ backgroundColor: 'var(--primary)', color: '#fff' }}
             >
               {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={() => onSelectFrame(Math.min(frames.length - 1, currentFrameIndex + 1))}
               disabled={currentFrameIndex === frames.length - 1}
-              className="p-1 rounded disabled:opacity-30"
+              whileHover={{ scale: currentFrameIndex === frames.length - 1 ? 1 : 1.12 }}
+              whileTap={{ scale: currentFrameIndex === frames.length - 1 ? 1 : 0.9 }}
+              transition={springFast}
+              className="p-1 rounded disabled:opacity-30 transition-colors"
               style={{ color: 'var(--text-secondary)' }}
             >
               <SkipForward className="w-3.5 h-3.5" />
-            </button>
+            </motion.button>
           </div>
 
           <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -128,23 +143,29 @@ export default memo(function FramePanel({
                 </span>
 
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
+                  <motion.button
                     onClick={(e) => { e.stopPropagation(); onDuplicateFrame(index); }}
-                    className="p-0.5 rounded"
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.88 }}
+                    transition={springFast}
+                    className="p-0.5 rounded transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                     title="复制帧"
                   >
                     <Copy className="w-2.5 h-2.5" />
-                  </button>
+                  </motion.button>
                   {frames.length > 1 && (
-                    <button
+                    <motion.button
                       onClick={(e) => { e.stopPropagation(); onRemoveFrame(index); }}
-                      className="p-0.5 rounded"
+                      whileHover={{ scale: 1.15 }}
+                      whileTap={{ scale: 0.88 }}
+                      transition={springFast}
+                      className="p-0.5 rounded transition-colors"
                       style={{ color: 'var(--danger)' }}
                       title="删除帧"
                     >
                       <Trash2 className="w-2.5 h-2.5" />
-                    </button>
+                    </motion.button>
                   )}
                 </div>
 

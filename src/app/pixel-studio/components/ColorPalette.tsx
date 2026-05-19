@@ -135,11 +135,12 @@ const ColorCell = memo(function ColorCell({
           ? '2px solid var(--text-primary)'
           : isSecondary
             ? '2px solid var(--text-primary)'
-            : '1px solid var(--border-color)',
+            : '1px solid var(--input-border)',
         transform: isActive ? 'scale(1.15)' : 'scale(1)',
         zIndex: isActive ? 2 : 1,
         outline: isActive ? `2px solid ${color}` : 'none',
         outlineOffset: '1px',
+        boxShadow: !isActive && !isSecondary ? 'inset 0 0 0 1px rgba(0,0,0,0.08)' : 'none',
       }}
       title={`${color}\n${isActive ? '✓ 主色' : isSecondary ? '◎ 副色' : ''}${isActive || isSecondary ? '' : '左键选择 · 右键设为副色'}`}
     />
@@ -224,7 +225,7 @@ export default memo(function ColorPalette({
                   >
                     <div className="flex gap-0.5">
                       {palette.colors.slice(0, 5).map((c, i) => (
-                        <div key={i} className="w-3 h-3 rounded-sm" style={{ backgroundColor: c.color, border: '1px solid var(--border-color)' }} />
+                        <div key={i} className="w-3 h-3 rounded-sm" style={{ backgroundColor: c.color, border: '1px solid var(--input-border)' }} />
                       ))}
                     </div>
                     <span>{palette.name}</span>
@@ -236,7 +237,7 @@ export default memo(function ColorPalette({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 p-2 rounded-lg" style={{ backgroundColor: 'var(--button-bg)' }}>
+      <div className="flex flex-wrap gap-1 px-1.5 py-2 rounded-lg" style={{ backgroundColor: 'var(--button-bg)' }}>
         {colors.map((color, index) => (
           <ColorCell
             key={`${color}-${index}`}
@@ -251,7 +252,7 @@ export default memo(function ColorPalette({
 
       {onAddColor && (
         <div className="flex items-center gap-1.5">
-          <div className="relative w-7 h-7 rounded overflow-hidden flex-shrink-0" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="relative w-7 h-7 rounded overflow-hidden flex-shrink-0" style={{ border: '1px solid var(--input-border)' }}>
             <div className="w-full h-full" style={{ backgroundColor: customColor }} />
             <input
               ref={colorInputRef}

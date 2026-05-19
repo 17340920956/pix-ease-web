@@ -17,6 +17,7 @@ import {
   Palette,
   TextCursorInput,
   Eye,
+  RotateCcw,
 } from 'lucide-react';
 import { useImageStore } from '@/store/useImageStore';
 import TopHeader from '@/components/TopHeader';
@@ -33,6 +34,8 @@ import {
 } from '@/lib/imageUtils';
 import AuthGuard from '@/components/AuthGuard';
 import type { ImageFile, ProcessType, ImageFormat, CompressQuality, PixelStyle, AsciiPreset } from '@/store/useImageStore';
+
+const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 /**
  * 图片处理工具页面
@@ -89,6 +92,7 @@ function ImageToolContent() {
   const [asciiResult, setAsciiResult] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
   const [compareImage, setCompareImage] = useState<ImageFile | null>(null);
+  const [fullPreviewUrl, setFullPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /**
@@ -399,13 +403,14 @@ function ImageToolContent() {
       {/* 顶部导航 */}
       <TopHeader>
         {images.length > 0 && (
-          <button
+          <motion.button
             onClick={clearImages}
-            className="flex items-center gap-1 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all text-sm font-medium active:scale-95"
+            whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+            className="flex items-center gap-1 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all text-sm font-medium"
           >
             <Trash2 className="w-4 h-4" />
             <span>清空</span>
-          </button>
+          </motion.button>
         )}
       </TopHeader>
 
@@ -415,7 +420,7 @@ function ImageToolContent() {
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
             {(['convert', 'compress', 'pixelate', 'ascii'] as ProcessType[]).map(
               (type) => (
-                <button
+                <motion.button
                   key={type}
                   onClick={() => setProcessType(type)}
                   className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-sm"
@@ -440,12 +445,12 @@ function ImageToolContent() {
                       (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
                     }
                   }}
-                >
+                 whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                   {getProcessTypeIcon(type)}
                   <span className="font-medium">
                     {getProcessTypeName(type)}
                   </span>
-                </button>
+                </motion.button>
               )
             )}
           </div>
@@ -493,7 +498,7 @@ function ImageToolContent() {
                     <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                       图片列表 ({images.length})
                     </h3>
-                    <button
+                    <motion.button
                       onClick={processImages}
                       disabled={isProcessing}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
@@ -501,38 +506,41 @@ function ImageToolContent() {
                         backgroundColor: isProcessing ? 'var(--text-muted)' : 'var(--primary)',
                         color: '#ffffff',
                       }}
-                    >
+                     whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                       {isProcessing ? (
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       ) : (
                         <Check className="w-4 h-4" />
                       )}
                       开始处理
-                    </button>
+                    </motion.button>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))' }}>
-                    {images.map((image) => (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 240px), 1fr))' }}>
+                    {images.map((image) => {
+                      const typeColor = image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) : 'transparent';
+                      const typeColorLight = image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) + '18' : 'transparent';
+                      return (
                       <motion.div
                         key={image.id}
                         layout
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className="relative group"
+                        className="relative group flex flex-col rounded-xl overflow-hidden"
+                        style={{
+                          backgroundColor: 'var(--card-bg)',
+                          border: '1px solid var(--border-color)',
+                        }}
                       >
-                        <div className={`aspect-square rounded-xl overflow-hidden relative max-h-[280px] ${image.status === 'completed' && image.processParams?.processType ? 'border-t-[3px]' : ''}`}
-                         style={{
-                           backgroundColor: 'var(--button-bg)',
-                           ...(image.status === 'completed' && image.processParams?.processType
-                             ? { borderTopColor: getProcessTypeColor(image.processParams.processType) }
-                             : {}),
-                         }}>
-                          {/* 处理完成且不是ASCII模式：左右对比展示 */}
+                        {/* 图片预览 - 透明背景棋盘格 */}
+                        <div className="aspect-square relative overflow-hidden"
+                          style={{
+                            backgroundImage: 'repeating-conic-gradient(var(--button-bg) 0% 25%, transparent 0% 50%) 50% / 20px 20px',
+                          }}>
                           {image.status === 'completed' && image.processedUrl ? (
                             <div className="w-full h-full flex">
-                              {/* 原图 - 左侧 */}
-                              <div className="flex-1 relative" style={{ borderRight: '1px solid var(--border-color)' }}>
+                              <div className="flex-1 relative cursor-pointer" style={{ borderRight: '1px solid var(--border-color)' }} onClick={() => setFullPreviewUrl(image.previewUrl)}>
                                 <img
                                   src={image.previewUrl}
                                   alt="Original"
@@ -541,77 +549,55 @@ function ImageToolContent() {
                                 <div className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded">
                                   原图
                                 </div>
-                                <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded text-center">
-                                  {formatFileSize(image.originalSize)}
-                                </div>
                               </div>
-                              {/* 处理后 - 右侧 */}
-                              <div className="flex-1 relative">
+                              <div className="flex-1 relative cursor-pointer" onClick={() => setFullPreviewUrl(image.processedUrl!)}>
                                 <img
                                   src={image.processedUrl}
                                   alt="Processed"
                                   className="w-full h-full object-cover"
                                 />
                                 <div className="absolute top-1 right-1 text-white text-[10px] px-1.5 py-0.5 rounded"
-                                  style={{ backgroundColor: image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) : '#3b82f6' }}>
-                                  {image.processParams?.processType === 'convert' && '转换后'}
-                                  {image.processParams?.processType === 'compress' && '压缩后'}
-                                  {image.processParams?.processType === 'pixelate' && '像素化'}
+                                  style={{ backgroundColor: typeColor }}>
+                                  {image.processParams?.processType === 'convert' && '转换'}
+                                  {image.processParams?.processType === 'compress' && '压缩'}
+                                  {image.processParams?.processType === 'pixelate' && '像素'}
                                   {image.processParams?.processType === 'ascii' && 'ASCII'}
-                                </div>
-                                <div className="absolute bottom-1 left-1 right-1 text-white text-[10px] px-1.5 py-0.5 rounded text-center"
-                                 style={{ backgroundColor: image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) : '#3b82f6' }}>
-                                  {formatFileSize(image.processedSize || 0)}
-                                  {image.processParams?.processType === 'compress' && (
-                                    <span className={`ml-1 ${getCompressionRate(image.originalSize, image.processedSize || 0) >= 0 ? 'text-green-200' : 'text-orange-200'}`}>
-                                      {getCompressionRate(image.originalSize, image.processedSize || 0) >= 0 ? '-' : '+'}{Math.abs(getCompressionRate(image.originalSize, image.processedSize || 0))}%
-                                    </span>
-                                  )}
-                                  {image.processParams?.processType === 'convert' && image.processedSize && (
-                                    <span className="ml-1 text-blue-200">
-                                      {getCompressionRate(image.originalSize, image.processedSize) > 0 ? `-${getCompressionRate(image.originalSize, image.processedSize)}%` : `+${Math.abs(getCompressionRate(image.originalSize, image.processedSize))}%`}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                             </div>
                           ) : (
-                            /* 未完成：正常展示 */
                             <img
                               src={image.previewUrl}
                               alt={image.file.name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => setFullPreviewUrl(image.previewUrl)}
                             />
                           )}
                         </div>
 
-                        <div className="mt-2 space-y-1">
-                          <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                        {/* 详情卡片 */}
+                        <div className="p-3 space-y-2" style={{ backgroundColor: typeColorLight }}>
+                          {/* 文件名 */}
+                          <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                             {image.file.name}
                           </p>
-                          {/* 未完成时显示原始大小 */}
+                          {/* 文件大小 - 未完成时 */}
                           {image.status !== 'completed' && (
-                            <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
+                            <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                              <ImageIcon className="w-3 h-3" />
                               <span>{formatFileSize(image.originalSize)}</span>
                             </div>
                           )}
-                          {/* 处理完成：显示详细对比信息 */}
+                          {/* 处理完成：显示处理详情 */}
                           {image.status === 'completed' && image.processedSize && (
-                            <div className="rounded-lg p-2 mt-2 space-y-1.5 border-l-[3px] border"
-                              style={{
-                                backgroundColor: 'var(--button-bg)',
-                                borderColor: 'var(--input-border)',
-                                ...(image.processParams?.processType
-                                  ? { borderLeftColor: getProcessTypeColor(image.processParams.processType) }
-                                  : {}),
-                              }}>
+                            <>
                               <div className="flex items-center justify-between text-xs">
                                 <span style={{ color: 'var(--text-muted)' }}>处理前</span>
                                 <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{formatFileSize(image.originalSize)}</span>
                               </div>
                               <div className="flex items-center justify-between text-xs">
                                 <span style={{ color: 'var(--text-muted)' }}>处理后</span>
-                                <span className="font-medium" style={{ color: 'var(--primary)' }}>{formatFileSize(image.processedSize)}</span>
+                                <span className="font-medium" style={{ color: typeColor }}>{formatFileSize(image.processedSize)}</span>
                               </div>
                               {image.processParams?.processType === 'compress' && (
                                 <div className="flex items-center justify-between text-xs">
@@ -645,16 +631,18 @@ function ImageToolContent() {
                                   </div>
                                 </>
                               )}
-                              <div className="flex gap-1 mt-1">
-                                <button
+                              {/* 操作按钮 7:3 */}
+                              <div className="grid grid-cols-10 gap-1.5 pt-1">
+                                <motion.button
                                   onClick={() => setCompareImage(image)}
-                                  className="flex-1 px-2 py-1.5 text-white rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  style={{ backgroundColor: 'var(--primary)' }}
+                                  className="col-span-7 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                                  style={{ backgroundColor: typeColor, color: '#ffffff' }}
+                                  whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
                                 >
                                   <Eye className="w-3 h-3" />
                                   对比
-                                </button>
-                                <button
+                                </motion.button>
+                                <motion.button
                                   onClick={() => {
                                     if (image.processedUrl) {
                                       URL.revokeObjectURL(image.processedUrl);
@@ -667,45 +655,49 @@ function ImageToolContent() {
                                       processParams: undefined,
                                     });
                                   }}
-                                  className="flex-1 px-2 py-1.5 text-white rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  style={{ backgroundColor: 'var(--warning)' }}
+                                  className="col-span-3 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center"
+                                  style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)' }}
+                                  whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
                                   title="重置为未处理状态"
                                 >
-                                  重置
-                                </button>
+                                  <RotateCcw className="w-3 h-3" />
+                                </motion.button>
                               </div>
-                            </div>
+                            </>
                           )}
                         </div>
 
-                        {/* 操作按钮 */}
+                        {/* 悬浮操作按钮 */}
                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {image.status === 'completed' && (
-                            <button
+                            <motion.button
                               onClick={() => downloadImage(image)}
                               className="p-1.5 text-white rounded-lg"
                               style={{ backgroundColor: 'var(--primary)' }}
+                              whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} transition={springFast}
                             >
                               <Download className="w-4 h-4" />
-                            </button>
+                            </motion.button>
                           )}
-                          <button
+                          <motion.button
                             onClick={() => removeImage(image.id)}
                             className="p-1.5 text-white rounded-lg"
                             style={{ backgroundColor: 'var(--danger)' }}
+                            whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} transition={springFast}
                           >
                             <X className="w-4 h-4" />
-                          </button>
+                          </motion.button>
                         </div>
 
                         {/* 状态指示 */}
                         {image.status === 'processing' && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-xl">
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                           </div>
                         )}
                       </motion.div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}
@@ -737,7 +729,7 @@ function ImageToolContent() {
                       ] as { value: ImageFormat; label: string; desc: string }[]).map(
                         (format) => (
                           <div key={format.value} className="relative group">
-                            <button
+                            <motion.button
                               onClick={() => setTargetFormat(format.value)}
                               className="w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors"
                               style={{
@@ -756,9 +748,9 @@ function ImageToolContent() {
                                   (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
                                 }
                               }}
-                            >
+                             whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                               {format.label}
-                            </button>
+                            </motion.button>
                             {/* 悬浮提示 */}
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 w-48 text-center leading-relaxed"
                               style={{ backgroundColor: 'var(--text-primary)', color: 'var(--background)' }}
@@ -790,7 +782,7 @@ function ImageToolContent() {
                           { value: 'custom', label: '自定义' },
                         ] as { value: CompressQuality; label: string }[]
                       ).map((option) => (
-                        <button
+                        <motion.button
                           key={option.value}
                           onClick={() => setCompressQuality(option.value)}
                           className="w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors"
@@ -810,9 +802,9 @@ function ImageToolContent() {
                               (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
                             }
                           }}
-                        >
+                         whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                           {option.label}
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
                   </div>
@@ -860,7 +852,7 @@ function ImageToolContent() {
                           label: string;
                         }[]
                       ).map((option) => (
-                        <button
+                        <motion.button
                           key={option.value}
                           onClick={() => setPixelStyle(option.value)}
                           className="w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors"
@@ -880,9 +872,9 @@ function ImageToolContent() {
                               (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
                             }
                           }}
-                        >
+                         whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                           {option.label}
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
                   </div>
@@ -915,11 +907,11 @@ function ImageToolContent() {
                       <Grid3x3 className="w-4 h-4" />
                       显示辅助网格
                     </label>
-                    <button
+                    <motion.button
                       onClick={() => setShowPixelGrid(!showPixelGrid)}
                       className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
                       style={{ backgroundColor: showPixelGrid ? 'var(--primary)' : 'var(--text-muted)' }}
-                    >
+                     whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                       <span
                         className="inline-block h-4 w-4 transform rounded-full transition-transform"
                         style={{
@@ -927,7 +919,7 @@ function ImageToolContent() {
                           transform: showPixelGrid ? 'translateX(1.5rem)' : 'translateX(0.25rem)',
                         }}
                       />
-                    </button>
+                    </motion.button>
                   </div>
                   <p className="text-xs -mt-2" style={{ color: 'var(--text-muted)' }}>
                     开启后在像素块之间显示白色网格线，方便手工复刻
@@ -950,7 +942,7 @@ function ImageToolContent() {
                           { value: 'ascii-color', label: '彩色 ASCII' },
                         ] as { value: PixelStyle; label: string }[]
                       ).map((option) => (
-                        <button
+                        <motion.button
                           key={option.value}
                           onClick={() => {
                             setPixelStyle(option.value);
@@ -975,9 +967,9 @@ function ImageToolContent() {
                               (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
                             }
                           }}
-                        >
+                         whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                           {option.label}
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
 
@@ -996,19 +988,37 @@ function ImageToolContent() {
                             { color: '#dcfce7', name: '浅绿' },
                             { color: '#dbeafe', name: '浅蓝' },
                             { color: '#fce7f3', name: '浅粉' },
-                          ].map((preset) => (
-                            <button
-                              key={preset.color}
-                              onClick={() => setAsciiBgColor(preset.color)}
-                              className="w-7 h-7 rounded-lg border-2 transition-all"
-                              style={{
-                                backgroundColor: preset.color,
-                                borderColor: asciiBgColor === preset.color ? 'var(--primary)' : 'var(--input-border)',
-                                transform: asciiBgColor === preset.color ? 'scale(1.1)' : 'scale(1)',
-                              }}
-                              title={preset.name}
-                            />
-                          ))}
+                          ].map((preset) => {
+                            const isActive = asciiBgColor === preset.color;
+                            return (
+                              <button
+                                key={preset.color}
+                                onClick={() => setAsciiBgColor(preset.color)}
+                                className="relative w-7 h-7 rounded transition-transform hover:scale-110 active:scale-95 flex-shrink-0"
+                                style={{
+                                  backgroundColor: preset.color,
+                                  transform: isActive ? 'scale(1.15)' : 'scale(1)',
+                                  outline: isActive ? '2px solid var(--primary)' : 'none',
+                                  outlineOffset: isActive ? 2 : 0,
+                                }}
+                                title={preset.name}
+                                onMouseEnter={(e) => {
+                                  if (!isActive) {
+                                    e.currentTarget.style.outline = '2px solid var(--primary)';
+                                    e.currentTarget.style.outlineOffset = '2px';
+                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isActive) {
+                                    e.currentTarget.style.outline = 'none';
+                                    e.currentTarget.style.outlineOffset = '0';
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                  }
+                                }}
+                              />
+                            );
+                          })}
                         </div>
                         {/* 背景颜色自定义输入 */}
                         <div className="flex items-center gap-2">
@@ -1055,18 +1065,36 @@ function ImageToolContent() {
                           文字颜色
                         </label>
                         <div className="flex flex-wrap gap-2 mb-2">
-                          {asciiTextColors.map((color, index) => (
-                            <button
-                              key={`${color}-${index}`}
-                              onClick={() => setAsciiTextColorIndex(index)}
-                              className="w-7 h-7 rounded-lg border-2 transition-all"
-                              style={{
-                                backgroundColor: color,
-                                borderColor: asciiTextColorIndex === index ? 'var(--primary)' : 'var(--input-border)',
-                                transform: asciiTextColorIndex === index ? 'scale(1.1)' : 'scale(1)',
-                              }}
-                            />
-                          ))}
+                          {asciiTextColors.map((color, index) => {
+                            const isActive = asciiTextColorIndex === index;
+                            return (
+                              <button
+                                key={`${color}-${index}`}
+                                onClick={() => setAsciiTextColorIndex(index)}
+                                className="relative w-7 h-7 rounded transition-transform hover:scale-110 active:scale-95 flex-shrink-0"
+                                style={{
+                                  backgroundColor: color,
+                                  transform: isActive ? 'scale(1.15)' : 'scale(1)',
+                                  outline: isActive ? '2px solid var(--primary)' : 'none',
+                                  outlineOffset: isActive ? 2 : 0,
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isActive) {
+                                    e.currentTarget.style.outline = '2px solid var(--primary)';
+                                    e.currentTarget.style.outlineOffset = '2px';
+                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isActive) {
+                                    e.currentTarget.style.outline = 'none';
+                                    e.currentTarget.style.outlineOffset = '0';
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                  }
+                                }}
+                              />
+                            );
+                          })}
                         </div>
                         {/* 文字颜色自定义输入 */}
                         <div className="flex items-center gap-2">
@@ -1126,7 +1154,7 @@ function ImageToolContent() {
                     <div className="grid grid-cols-2 gap-2">
                       {(Object.entries(ASCII_PRESETS) as [AsciiPreset, typeof ASCII_PRESETS[string]][]).map(
                         ([key, preset]) => (
-                          <button
+                          <motion.button
                             key={key}
                             onClick={() => setAsciiPreset(key)}
                             className="px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors"
@@ -1146,7 +1174,7 @@ function ImageToolContent() {
                                 (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
                               }
                             }}
-                          >
+                           whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                             <div className="flex items-center justify-between">
                               <span>{preset.name}</span>
                             </div>
@@ -1155,7 +1183,7 @@ function ImageToolContent() {
                                 {preset.chars}
                               </div>
                             )}
-                          </button>
+                          </motion.button>
                         )
                       )}
                     </div>
@@ -1264,15 +1292,15 @@ function ImageToolContent() {
                   {compareImage.processParams?.processType === 'pixelate' && '像素化对比'}
                   {compareImage.processParams?.processType === 'ascii' && 'ASCII 艺术对比'}
                 </h3>
-                <button
+                <motion.button
                   onClick={() => setCompareImage(null)}
                   className="p-2 rounded-lg transition-colors"
                   style={{ color: 'var(--text-secondary)' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)'; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
-                >
+                 whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}>
                   <X className="w-5 h-5" />
-                </button>
+                </motion.button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1354,6 +1382,42 @@ function ImageToolContent() {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 单图全屏预览弹窗 */}
+      <AnimatePresence>
+        {fullPreviewUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-8"
+            style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+            onClick={() => setFullPreviewUrl(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={fullPreviewUrl}
+                alt="Preview"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              />
+            </motion.div>
+            <motion.button
+              onClick={() => setFullPreviewUrl(null)}
+              className="absolute top-4 right-4 p-2 rounded-full transition-colors"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff' }}
+              whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+            >
+              <X className="w-6 h-6" />
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>

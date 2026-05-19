@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { coordKey, generateId, toMap, hexToRgba, rgbaToHex, hslToRgb, rgbToHsl } from '@/lib/pixelUtils';
+import { BlendMode } from '@/types/pixel';
 
 export type PixelTool =
   | 'brush'
@@ -17,24 +18,6 @@ export type PixelTool =
   | 'gradient';
 
 export type SymmetryMode = 'none' | 'horizontal' | 'vertical' | 'quad';
-
-export type BlendMode =
-  | 'normal'
-  | 'multiply'
-  | 'screen'
-  | 'overlay'
-  | 'darken'
-  | 'lighten'
-  | 'color-dodge'
-  | 'color-burn'
-  | 'difference'
-  | 'exclusion'
-  | 'hue'
-  | 'saturation'
-  | 'color'
-  | 'luminosity'
-  | 'hard-light'
-  | 'soft-light';
 
 export interface PixelCoord { x: number; y: number }
 
@@ -248,6 +231,23 @@ const DEFAULT_PALETTES: Palette[] = [
       { color: '#b8d4a8' }, { color: '#d0e4c0' }, { color: '#e4f0d8' }, { color: '#f0f8e8' },
       { color: '#faf8f0' }, { color: '#ffffff' }, { color: '#2e2420' }, { color: '#4a3830' },
       { color: '#684c3c' }, { color: '#886048' }, { color: '#a87858' }, { color: '#c09068' },
+    ],
+  },
+  {
+    id: 'gameboy',
+    name: 'GameBoy',
+    colors: [
+      { color: '#0f380f' }, { color: '#306230' }, { color: '#8bac0f' }, { color: '#9bbc0f' },
+    ],
+  },
+  {
+    id: 'grayscale',
+    name: '灰度',
+    colors: [
+      { color: '#000000' }, { color: '#111111' }, { color: '#222222' }, { color: '#333333' },
+      { color: '#444444' }, { color: '#555555' }, { color: '#666666' }, { color: '#777777' },
+      { color: '#888888' }, { color: '#999999' }, { color: '#aaaaaa' }, { color: '#bbbbbb' },
+      { color: '#cccccc' }, { color: '#dddddd' }, { color: '#eeeeee' }, { color: '#ffffff' },
     ],
   },
   {
@@ -1422,6 +1422,28 @@ export const usePixelStore = create<PixelState>()(
               ),
             }));
           }
+        };
+      },
+      merge: (persisted, current) => {
+        const p = persisted as Partial<PixelState>;
+        const mergedPalettes = (p.palettes || current.palettes).map((palette) => {
+          const defaultPalette = DEFAULT_PALETTES.find((dp) => dp.id === palette.id);
+          if (defaultPalette) {
+            const existingColorIds = new Set(palette.colors.map((c) => c.color));
+            const missingColors = defaultPalette.colors.filter(
+              (dc) => !existingColorIds.has(dc.color)
+            );
+            return { ...palette, colors: [...palette.colors, ...missingColors] };
+          }
+          return palette;
+        });
+        const missingPalettes = DEFAULT_PALETTES.filter(
+          (dp) => !mergedPalettes.some((mp) => mp.id === dp.id)
+        );
+        return {
+          ...current,
+          ...p,
+          palettes: [...mergedPalettes, ...missingPalettes],
         };
       },
     }

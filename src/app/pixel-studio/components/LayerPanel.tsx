@@ -1,6 +1,7 @@
 'use client';
 
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
+import { motion } from 'framer-motion';
 import {
   Plus,
   Trash2,
@@ -13,6 +14,8 @@ import {
   ArrowDown,
   Merge,
 } from 'lucide-react';
+
+const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 interface LayerData {
   id: string;
@@ -55,14 +58,17 @@ export default memo(function LayerPanel({
         <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
           图层
         </span>
-        <button
+        <motion.button
           onClick={onAddLayer}
+          whileHover={{ scale: 1.12 }}
+          whileTap={{ scale: 0.9 }}
+          transition={springFast}
           className="p-1 rounded transition-colors"
           style={{ color: 'var(--text-secondary)' }}
           title="添加图层"
         >
           <Plus className="w-3.5 h-3.5" />
-        </button>
+        </motion.button>
       </div>
 
       <div className="space-y-1 max-h-[200px] overflow-y-auto">
@@ -93,14 +99,17 @@ export default memo(function LayerPanel({
                 }
               }}
             >
-              <button
+              <motion.button
                 onClick={(e) => { e.stopPropagation(); onToggleVisibility(layer.id); }}
-                className="p-0.5 rounded flex-shrink-0"
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.88 }}
+                transition={springFast}
+                className="p-0.5 rounded flex-shrink-0 transition-colors"
                 style={{ color: layer.visible ? 'var(--text-secondary)' : 'var(--text-muted)' }}
                 title={layer.visible ? '隐藏' : '显示'}
               >
                 {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-              </button>
+              </motion.button>
 
               <span
                 className="flex-1 text-xs truncate"
@@ -111,63 +120,81 @@ export default memo(function LayerPanel({
 
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 {canMoveUp && (
-                  <button
+                  <motion.button
                     onClick={(e) => { e.stopPropagation(); onMoveLayer(layer.id, 'up'); }}
-                    className="p-0.5 rounded"
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.88 }}
+                    transition={springFast}
+                    className="p-0.5 rounded transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                     title="上移"
                   >
                     <ArrowUp className="w-2.5 h-2.5" />
-                  </button>
+                  </motion.button>
                 )}
                 {canMoveDown && (
-                  <button
+                  <motion.button
                     onClick={(e) => { e.stopPropagation(); onMoveLayer(layer.id, 'down'); }}
-                    className="p-0.5 rounded"
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.88 }}
+                    transition={springFast}
+                    className="p-0.5 rounded transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                     title="下移"
                   >
                     <ArrowDown className="w-2.5 h-2.5" />
-                  </button>
+                  </motion.button>
                 )}
-                <button
+                <motion.button
                   onClick={(e) => { e.stopPropagation(); onDuplicateLayer(layer.id); }}
-                  className="p-0.5 rounded"
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.88 }}
+                  transition={springFast}
+                  className="p-0.5 rounded transition-colors"
                   style={{ color: 'var(--text-muted)' }}
                   title="复制"
                 >
                   <Copy className="w-2.5 h-2.5" />
-                </button>
+                </motion.button>
                 {canMerge && (
-                  <button
+                  <motion.button
                     onClick={(e) => { e.stopPropagation(); onMergeDown(layer.id); }}
-                    className="p-0.5 rounded"
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.88 }}
+                    transition={springFast}
+                    className="p-0.5 rounded transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                     title="向下合并"
                   >
                     <Merge className="w-2.5 h-2.5" />
-                  </button>
+                  </motion.button>
                 )}
                 {layers.length > 1 && (
-                  <button
+                  <motion.button
                     onClick={(e) => { e.stopPropagation(); onRemoveLayer(layer.id); }}
-                    className="p-0.5 rounded"
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.88 }}
+                    transition={springFast}
+                    className="p-0.5 rounded transition-colors"
                     style={{ color: 'var(--danger)' }}
                     title="删除"
                   >
                     <Trash2 className="w-2.5 h-2.5" />
-                  </button>
+                  </motion.button>
                 )}
               </div>
 
-              <button
+              <motion.button
                 onClick={(e) => { e.stopPropagation(); onToggleLock(layer.id); }}
-                className="p-0.5 rounded flex-shrink-0"
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.88 }}
+                transition={springFast}
+                className="p-0.5 rounded flex-shrink-0 transition-colors"
                 style={{ color: layer.locked ? 'var(--warning)' : 'var(--text-muted)' }}
                 title={layer.locked ? '解锁' : '锁定'}
               >
                 {layer.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-              </button>
+              </motion.button>
             </div>
           );
         })}

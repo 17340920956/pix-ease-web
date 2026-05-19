@@ -29,18 +29,10 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   }, []);
 
   useEffect(() => {
-    // 在 html 元素上设置 data-theme 属性（使用解析后的主题）
     const html = document.documentElement;
     html.setAttribute('data-theme', resolvedTheme);
-
-    // 同时设置 class 以兼容 Tailwind 的 dark mode
     html.classList.remove('light', 'dark', 'eye-care');
     html.classList.add(resolvedTheme);
-
-    // 更新 body 背景色
-    const config = useThemeStore.getState().getThemeConfig();
-    document.body.style.backgroundColor = config.background;
-    document.body.style.color = config.foreground;
   }, [resolvedTheme]);
 
   return <>{children}</>;

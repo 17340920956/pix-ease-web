@@ -1,7 +1,10 @@
 'use client';
 
 import { memo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Pencil, Eraser, PaintBucket, Pipette, Move, Square, Circle, Minus, Hand, SprayCan, ArrowUpDown } from 'lucide-react';
+
+const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 export type PixelTool = 'brush' | 'eraser' | 'bucket' | 'picker' | 'line' | 'rect' | 'ellipse' | 'move' | 'hand' | 'spray';
 
@@ -49,11 +52,14 @@ const ToolButton = memo(function ToolButton({
   const [showTip, setShowTip] = useState(false);
 
   return (
-    <button
+    <motion.button
       onClick={() => onSelect(tool.id)}
       onMouseEnter={() => setShowTip(true)}
       onMouseLeave={() => setShowTip(false)}
-      className="relative w-9 h-8 flex items-center justify-center rounded-lg transition-all"
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.92 }}
+      transition={springFast}
+      className="relative w-9 h-8 flex items-center justify-center rounded-lg transition-colors"
       style={{
         backgroundColor: showTip && !isActive ? 'var(--button-bg)' : isActive ? 'var(--primary)' : 'transparent',
         color: showTip && !isActive ? 'var(--text-primary)' : isActive ? '#ffffff' : 'var(--text-secondary)',
@@ -72,7 +78,7 @@ const ToolButton = memo(function ToolButton({
           {tool.label} ({tool.shortcut})
         </span>
       )}
-    </button>
+    </motion.button>
   );
 });
 
@@ -88,11 +94,14 @@ const BrushSizeButton = memo(function BrushSizeButton({
   const [showTip, setShowTip] = useState(false);
 
   return (
-    <button
+    <motion.button
       onClick={onSelect}
       onMouseEnter={() => setShowTip(true)}
       onMouseLeave={() => setShowTip(false)}
-      className="w-9 h-7 flex items-center justify-center rounded transition-all relative"
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.92 }}
+      transition={springFast}
+      className="w-9 h-7 flex items-center justify-center rounded transition-colors relative"
       style={{ backgroundColor: isActive ? 'var(--primary-light)' : 'transparent' }}
     >
       <div
@@ -115,7 +124,7 @@ const BrushSizeButton = memo(function BrushSizeButton({
           {size}px
         </span>
       )}
-    </button>
+    </motion.button>
   );
 });
 
@@ -154,9 +163,12 @@ export default memo(function ToolBar({
 
       <div className="w-6 h-px my-2" style={{ backgroundColor: 'var(--border-color)' }} />
 
-      <div
+      <motion.div
         className="relative w-9 h-9 cursor-pointer flex-shrink-0"
         onClick={onSwapColors}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.92 }}
+        transition={springFast}
         title="交换颜色 (X)"
       >
         <div
@@ -173,7 +185,7 @@ export default memo(function ToolBar({
             style={{ color: '#fff', filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.85))' }}
           />
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useRef } from 'react';
+import { motion } from 'framer-motion';
 import {
   Upload,
   Download,
@@ -10,6 +11,8 @@ import {
   RotateCcw,
   Trash2,
 } from 'lucide-react';
+
+const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 interface TopMenuBarProps {
   showGrid: boolean;
@@ -41,11 +44,14 @@ function ToolbarButton({
   danger?: boolean;
 }) {
   return (
-    <button
+    <motion.button
       onClick={onClick}
       disabled={disabled}
       title={label}
-      className="w-8 h-7 flex items-center justify-center rounded-md transition-all disabled:opacity-25"
+      whileHover={{ scale: disabled ? 1 : 1.08 }}
+      whileTap={{ scale: disabled ? 1 : 0.94 }}
+      transition={springFast}
+      className="w-8 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-25"
       style={{
         backgroundColor: active ? 'var(--primary-light)' : 'transparent',
         color: danger ? 'var(--danger)' : active ? 'var(--primary)' : 'var(--text-secondary)',
@@ -64,7 +70,7 @@ function ToolbarButton({
       }}
     >
       {icon}
-    </button>
+    </motion.button>
   );
 }
 

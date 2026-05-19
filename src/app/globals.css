@@ -50,6 +50,11 @@
 
   /* Scrollbar */
   --scrollbar-color: rgba(0, 0, 0, 0.15);
+
+  /* Component Tokens */
+  --button-bg: rgba(0, 0, 0, 0.04);
+  --button-hover-bg: rgba(0, 0, 0, 0.08);
+  --border-color: rgba(0, 0, 0, 0.08);
 }
 
 /* Dark Mode - Apple Style */
@@ -88,6 +93,11 @@
   --info: #0a84ff;
 
   --scrollbar-color: rgba(255, 255, 255, 0.15);
+
+  /* Component Tokens */
+  --button-bg: rgba(255, 255, 255, 0.06);
+  --button-hover-bg: rgba(255, 255, 255, 0.12);
+  --border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Eye Care Mode */
@@ -126,6 +136,11 @@
   --info: #5a8a9a;
 
   --scrollbar-color: rgba(100, 90, 70, 0.25);
+
+  /* Component Tokens */
+  --button-bg: rgba(250, 247, 240, 0.6);
+  --button-hover-bg: rgba(240, 235, 225, 0.8);
+  --border-color: rgba(200, 190, 170, 0.4);
 }
 
 /* ==========================================
@@ -304,6 +319,16 @@ body {
   animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -325,8 +350,17 @@ body {
   50% { transform: translateY(-12px); }
 }
 
+@keyframes subtlePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 113, 227, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(0, 113, 227, 0); }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+.animate-subtle-pulse {
+  animation: subtlePulse 3s ease-in-out infinite;
 }
 
 /* ==========================================

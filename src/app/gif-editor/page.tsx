@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Film,
@@ -12,16 +12,17 @@ import {
   Download,
   Trash2,
   RotateCcw,
-  GripVertical,
-  ChevronDown,
-  ChevronUp,
   Images,
+  Repeat,
+  Plus,
 } from 'lucide-react';
 import { useGifStore } from '@/store/useGifStore';
 import { parseGifFileAdvanced, generateGifBlob, downloadFile, reverseFrames } from '@/lib/gifUtils';
 import AuthGuard from '@/components/AuthGuard';
 import TopHeader from '@/components/TopHeader';
 import type { GifFrame } from '@/store/useGifStore';
+
+const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 /**
  * GIF 编辑器页面
@@ -44,21 +45,24 @@ function GifEditorContent() {
     frames,
     selectedFrameIndex,
     playbackSpeed,
-    framesExpanded,
     addFrames,
     removeFrame,
     reorderFrames,
     setSelectedFrameIndex,
     setPlaybackSpeed,
-    setFramesExpanded,
     reset,
   } = useGifStore();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
+  useEffect(() => {
+    loopRef.current = isLooping;
+  }, [isLooping]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const dragOverIndexRef = useRef<number | null>(null);
+  const dataUrlCacheRef = useRef<Map<string, string>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const frameInputRef = useRef<HTMLInputElement>(null);
   const playbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +70,7 @@ function GifEditorContent() {
     isPlaying: false,
     frameIndex: 0,
   });
+  const loopRef = useRef(false);
 
   /**
    * 处理 GIF 文件上传
@@ -178,13 +183,33 @@ function GifEditorContent() {
     if (frames.length === 0) return;
 
     playbackStateRef.current.isPlaying = true;
+    playbackStateRef.current.frameIndex = 0;
+    setSelectedFrameIndex(0);
     setIsPlaying(true);
 
     const playNext = () => {
       if (!playbackStateRef.current.isPlaying) return;
 
-      const nextIndex =
-        (playbackStateRef.current.frameIndex + 1) % frames.length;
+      const currentIndex = playbackStateRef.current.frameIndex;
+
+      if (currentIndex >= frames.length - 1) {
+        if (!loopRef.current) {
+          // Not looping: stop after showing last frame
+          setTimeout(() => {
+            playbackStateRef.current.isPlaying = false;
+            setIsPlaying(false);
+          }, (frames[currentIndex]?.delay || 100) / playbackSpeed);
+          return;
+        }
+        // Looping: wrap to first frame
+        playbackStateRef.current.frameIndex = 0;
+        setSelectedFrameIndex(0);
+        const delay = frames[0]?.delay || 100;
+        playbackTimerRef.current = setTimeout(playNext, delay / playbackSpeed);
+        return;
+      }
+
+      const nextIndex = currentIndex + 1;
       playbackStateRef.current.frameIndex = nextIndex;
       setSelectedFrameIndex(nextIndex);
 
@@ -251,21 +276,24 @@ function GifEditorContent() {
   const handleDragOver = useCallback(
     (e: React.DragEvent, index: number) => {
       e.preventDefault();
-      setDragOverIndex(index);
+      if (dragOverIndexRef.current === index) return;
+      dragOverIndexRef.current = index;
+      (e.currentTarget as HTMLElement).style.transform = 'scale(1.05)';
     },
     []
   );
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverIndex(null);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
   }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent, targetIndex: number) => {
       e.preventDefault();
+      (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+      dragOverIndexRef.current = null;
       if (draggingIndex === null || draggingIndex === targetIndex) {
         setDraggingIndex(null);
-        setDragOverIndex(null);
         return;
       }
 
@@ -275,7 +303,6 @@ function GifEditorContent() {
 
       reorderFrames(newFrames);
       setDraggingIndex(null);
-      setDragOverIndex(null);
 
       // 更新选中索引
       if (selectedFrameIndex === draggingIndex) {
@@ -297,7 +324,7 @@ function GifEditorContent() {
 
   const handleDragEnd = useCallback(() => {
     setDraggingIndex(null);
-    setDragOverIndex(null);
+    dragOverIndexRef.current = null;
   }, []);
 
   // 清理定时器
@@ -309,45 +336,71 @@ function GifEditorContent() {
     };
   }, []);
 
-  return (
-    <div className="min-h-screen gradient-bg">
-      {/* 顶部导航 */}
-      <TopHeader>
-        <button
-          onClick={handleExport}
-          disabled={frames.length === 0 || isProcessing}
-          className="flex items-center gap-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all text-sm font-medium"
-        >
-          <Download className="w-4 h-4" />
-          <span>导出 GIF</span>
-        </button>
-      </TopHeader>
+  // 缓存帧图片 dataURL，避免每次渲染都重新序列化 Canvas
+  const frameDataUrls = useMemo(() => {
+    const urls: string[] = [];
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      if (!frame.canvas) {
+        urls.push('');
+        continue;
+      }
+      const cached = dataUrlCacheRef.current.get(frame.id);
+      if (cached) {
+        urls.push(cached);
+      } else {
+        const url = frame.canvas.toDataURL();
+        dataUrlCacheRef.current.set(frame.id, url);
+        urls.push(url);
+      }
+    }
+    return urls;
+  }, [frames]);
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+  // 帧变化时清理缓存中已删除的帧
+  useEffect(() => {
+    const frameIds = new Set(frames.map(f => f.id));
+    for (const key of dataUrlCacheRef.current.keys()) {
+      if (!frameIds.has(key)) {
+        dataUrlCacheRef.current.delete(key);
+      }
+    }
+  }, [frames]);
+
+  return (
+    <div className="h-screen gradient-bg flex flex-col overflow-hidden">
+      {/* 顶部导航 */}
+      <TopHeader />
+
+      <div className="flex-1 overflow-hidden p-4">
         {/* 上传区域 */}
         {frames.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-2xl p-8"
+            className="h-full flex items-center justify-center"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 上传 GIF */}
-              <div
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl w-full">
+              <motion.div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed rounded-xl p-10 cursor-pointer transition-colors text-center"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="border-2 border-dashed rounded-2xl p-12 cursor-pointer transition-all text-center group"
                 style={{ borderColor: 'var(--input-border)' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--input-border)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)'; (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(59,130,246,0.05)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--input-border)'; (e.currentTarget as HTMLDivElement).style.backgroundColor = ''; }}
               >
-                <Film className="w-14 h-14 mx-auto mb-4" style={{ color: 'var(--primary)' }} />
-                <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 transition-transform group-hover:scale-110"
+                  style={{ backgroundColor: 'var(--primary)' }}>
+                  <Film className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
                   上传 GIF 文件
                 </h3>
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  点击上传 GIF 文件，自动拆分为帧序列
+                  自动拆分为帧序列进行编辑
                 </p>
-              </div>
+              </motion.div>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -356,22 +409,26 @@ function GifEditorContent() {
                 className="hidden"
               />
 
-              {/* 批量上传普通图片 */}
-              <div
+              <motion.div
                 onClick={() => frameInputRef.current?.click()}
-                className="border-2 border-dashed rounded-xl p-10 cursor-pointer transition-colors text-center"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="border-2 border-dashed rounded-2xl p-12 cursor-pointer transition-all text-center group"
                 style={{ borderColor: 'var(--input-border)' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--success)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--input-border)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--success)'; (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(34,197,94,0.05)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--input-border)'; (e.currentTarget as HTMLDivElement).style.backgroundColor = ''; }}
               >
-                <Images className="w-14 h-14 mx-auto mb-4" style={{ color: 'var(--success)' }} />
-                <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-5 transition-transform group-hover:scale-110"
+                  style={{ backgroundColor: 'var(--success)' }}>
+                  <Images className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
                   批量上传图片
                 </h3>
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  点击批量上传 JPG/PNG/WEBP 等图片，合成为 GIF
+                  上传 JPG/PNG/WEBP 合成为 GIF
                 </p>
-              </div>
+              </motion.div>
               <input
                 ref={frameInputRef}
                 type="file"
@@ -386,12 +443,15 @@ function GifEditorContent() {
 
         {/* 编辑区域 */}
         {frames.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 左侧：预览区域 */}
-            <div className="lg:col-span-2 space-y-4">
-              {/* 主预览 */}
-              <div className="glass rounded-2xl p-6">
-                <div className="aspect-video rounded-xl flex items-center justify-center overflow-hidden" style={{ backgroundColor: 'var(--button-bg)' }}>
+          <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden">
+            {/* 左侧：预览 + 播放控制 + 速度 + 操作 */}
+            <div className="flex flex-col min-h-0 overflow-hidden">
+              <div className="glass rounded-2xl p-4 flex flex-col flex-1 min-h-0">
+                <div className="flex-1 rounded-xl flex items-center justify-center overflow-hidden min-h-0"
+                  style={{
+                    backgroundColor: 'var(--button-bg)',
+                    backgroundImage: 'repeating-conic-gradient(var(--hover-overlay) 0% 25%, transparent 0% 50%) 50% / 20px 20px',
+                  }}>
                   {frames[selectedFrameIndex]?.canvas && (
                     <img
                       key={`preview-${selectedFrameIndex}`}
@@ -404,21 +464,31 @@ function GifEditorContent() {
 
                 {/* 播放控制 */}
                 <div className="flex items-center justify-center gap-4 mt-4">
-                  <button
+                  {/* 帧进度 */}
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{selectedFrameIndex + 1}</span>
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>/</span>
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{frames.length}</span>
+                  </div>
+
+                  <motion.button
                     onClick={() => {
                       stopPlayback();
                       setSelectedFrameIndex(Math.max(0, selectedFrameIndex - 1));
                     }}
                     disabled={selectedFrameIndex === 0}
+                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} transition={springFast}
                     className="p-2 transition-colors disabled:opacity-30"
                     style={{ color: 'var(--text-secondary)' }}
                     onMouseEnter={(e) => { if (selectedFrameIndex !== 0) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
                   >
                     <SkipBack className="w-5 h-5" />
-                  </button>
-                  <button
+                  </motion.button>
+
+                  <motion.button
                     onClick={togglePlayback}
+                    whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} transition={springFast}
                     className="p-3 rounded-full transition-colors"
                     style={{ backgroundColor: 'var(--primary)', color: '#ffffff' }}
                   >
@@ -427,61 +497,133 @@ function GifEditorContent() {
                     ) : (
                       <Play className="w-6 h-6" />
                     )}
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
                     onClick={() => {
                       stopPlayback();
                       setSelectedFrameIndex(Math.min(frames.length - 1, selectedFrameIndex + 1));
                     }}
                     disabled={selectedFrameIndex === frames.length - 1}
+                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} transition={springFast}
                     className="p-2 transition-colors disabled:opacity-30"
                     style={{ color: 'var(--text-secondary)' }}
                     onMouseEnter={(e) => { if (selectedFrameIndex !== frames.length - 1) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
                   >
                     <SkipForward className="w-5 h-5" />
-                  </button>
+                  </motion.button>
+
+                  {/* 循环播放切换 */}
+                  <motion.button
+                    onClick={() => setIsLooping(!isLooping)}
+                    whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} transition={springFast}
+                    className="p-2 rounded-lg transition-colors"
+                    style={{
+                      color: isLooping ? 'var(--primary)' : 'var(--text-muted)',
+                      backgroundColor: isLooping ? 'var(--button-bg)' : 'transparent',
+                    }}
+                    title={isLooping ? '关闭循环播放' : '开启循环播放'}
+                    onMouseEnter={(e) => { if (!isLooping) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+                    onMouseLeave={(e) => { if (!isLooping) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+                  >
+                    <Repeat className="w-5 h-5" />
+                  </motion.button>
                 </div>
 
-                {/* 帧信息 */}
-                <div className="text-center text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
-                  帧 {selectedFrameIndex + 1} / {frames.length}
+                {/* 播放速度 */}
+                <div className="mt-4 pt-3" style={{ borderTop: '1px solid var(--border-color)' }}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>速度</span>
+                    {[0.25, 0.5, 1, 2, 4, 8].map((speed) => (
+                      <motion.button
+                        key={speed}
+                        onClick={() => {
+                          setPlaybackSpeed(speed);
+                          if (playbackStateRef.current.isPlaying) {
+                            stopPlayback();
+                            setTimeout(() => startPlayback(), 0);
+                          }
+                        }}
+                        whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                        className="px-3 py-1.5 rounded text-sm font-medium transition-colors"
+                        style={{
+                          backgroundColor: playbackSpeed === speed ? 'var(--primary)' : 'var(--button-bg)',
+                          color: playbackSpeed === speed ? '#ffffff' : 'var(--text-secondary)',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (playbackSpeed !== speed) {
+                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
+                            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (playbackSpeed !== speed) {
+                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)';
+                            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                          }
+                        }}
+                      >
+                        {speed}x
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 操作按钮 */}
+                <div className="flex gap-2 mt-3">
+                  <motion.button
+                    onClick={handleExport}
+                    disabled={frames.length === 0 || isProcessing}
+                    whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-base font-medium text-white transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: 'var(--primary)' }}
+                  >
+                    <Download className="w-5 h-5" />
+                    导出 GIF
+                  </motion.button>
+                  <motion.button
+                    onClick={() => {
+                      stopPlayback();
+                      reset();
+                    }}
+                    whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-base font-medium transition-colors"
+                    style={{
+                      backgroundColor: 'var(--button-bg)',
+                      color: 'var(--text-secondary)',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)'; }}
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                    重置
+                  </motion.button>
                 </div>
               </div>
+            </div>
 
-              {/* 帧列表 - 可展开收起 */}
-              <div className="glass rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <button
-                    onClick={() => setFramesExpanded(!framesExpanded)}
-                    className="flex items-center gap-2 font-semibold transition-colors"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    {framesExpanded ? (
-                      <ChevronUp className="w-5 h-5" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5" />
-                    )}
-                    帧列表 ({frames.length})
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => frameInputRef.current?.click()}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-colors"
-                      style={{ backgroundColor: 'var(--success)', color: '#ffffff' }}
-                    >
-                      <Images className="w-4 h-4" />
-                      添加帧
-                    </button>
-                    <button
-                      onClick={handleReverse}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-colors"
-                      style={{ backgroundColor: 'var(--accent)', color: '#ffffff' }}
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      倒放
-                    </button>
+            {/* 右侧：帧列表 */}
+            <div className="flex flex-col min-h-0 overflow-hidden">
+              <div className="glass rounded-2xl p-3 flex flex-col flex-1 min-h-0">
+                {/* 固定标题 */}
+                <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 text-sm font-semibold"
+                    style={{ color: 'var(--text-primary)' }}>
+                    帧列表
+                    <span className="px-1.5 py-0.5 rounded-md text-xs font-medium"
+                      style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)' }}>
+                      {frames.length}
+                    </span>
                   </div>
+                  <motion.button
+                    onClick={() => frameInputRef.current?.click()}
+                    whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{ backgroundColor: 'var(--success)', color: '#ffffff' }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    添加帧
+                  </motion.button>
                 </div>
 
                 <input
@@ -493,242 +635,80 @@ function GifEditorContent() {
                   className="hidden"
                 />
 
-                {/* 始终显示两行预览 */}
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                  {frames.slice(0, 20).map((frame, index) => (
-                    <motion.div
-                      key={frame.id}
-                      layout
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, index)}
-                      onDragEnd={handleDragEnd}
-                      className="cursor-move rounded-lg overflow-hidden border-2 transition-all group"
-                      style={{
-                        borderColor: index === selectedFrameIndex
-                          ? 'var(--primary)'
-                          : dragOverIndex === index
-                          ? 'var(--primary)'
-                          : 'transparent',
-                        boxShadow: index === selectedFrameIndex ? `0 0 0 2px var(--primary)` : 'none',
-                        transform: dragOverIndex === index ? 'scale(1.05)' : 'scale(1)',
-                        opacity: draggingIndex === index ? 0.5 : 1,
-                      }}
-                      onClick={() => {
-                        stopPlayback();
-                        setSelectedFrameIndex(index);
-                        playbackStateRef.current.frameIndex = index;
-                      }}
-                    >
-                      <div className="relative">
-                        {frame.canvas && (
-                          <img
-                            src={frame.canvas.toDataURL()}
-                            alt={`Frame ${index + 1}`}
-                            className="w-full aspect-square object-cover"
-                            draggable={false}
-                          />
-                        )}
-                        {/* 操作按钮组 */}
-                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* 下载按钮 */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              downloadFrame(frame, index);
-                            }}
-                            className="p-1 rounded"
-                            style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: '#ffffff' }}
-                            title="下载帧"
-                          >
-                            <Download className="w-3 h-3" />
-                          </button>
-                          {/* 删除按钮 */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              stopPlayback();
-                              removeFrame(index);
-                            }}
-                            disabled={frames.length <= 1}
-                            className="p-1 rounded disabled:opacity-30"
-                            style={{ backgroundColor: 'var(--danger)', color: '#ffffff' }}
-                            title="删除帧"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="px-2 py-1 text-center flex items-center justify-center gap-1" style={{ backgroundColor: 'var(--text-primary)' }}>
-                        <GripVertical className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                        <span className="text-xs text-white">
-                          {index + 1}
-                        </span>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-
-                <AnimatePresence>
-                  {framesExpanded && frames.length > 20 && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 mt-2">
-                        {frames.slice(20).map((frame, index) => (
+                {/* 可滚动帧图片区域 */}
+                <div className="overflow-y-auto flex-1 min-h-0">
+                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                    {frames.map((frame, index) => (
                           <motion.div
                             key={frame.id}
-                            layout
                             draggable
-                            onDragStart={() => handleDragStart(index + 20)}
-                            onDragOver={(e) => handleDragOver(e, index + 20)}
+                            onDragStart={() => handleDragStart(index)}
+                            onDragOver={(e) => handleDragOver(e, index)}
                             onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, index + 20)}
+                            onDrop={(e) => handleDrop(e, index)}
                             onDragEnd={handleDragEnd}
-                            className="cursor-move rounded-lg overflow-hidden border-2 transition-all group"
+                            className="cursor-move rounded-lg overflow-hidden transition-transform group"
                             style={{
-                              borderColor: index + 20 === selectedFrameIndex
-                                ? 'var(--primary)'
-                                : dragOverIndex === index + 20
-                                ? 'var(--primary)'
-                                : 'transparent',
-                              boxShadow: index + 20 === selectedFrameIndex ? `0 0 0 2px var(--primary)` : 'none',
-                              transform: dragOverIndex === index + 20 ? 'scale(1.05)' : 'scale(1)',
-                              opacity: draggingIndex === index + 20 ? 0.5 : 1,
+                              outline: index === selectedFrameIndex ? '3px solid var(--primary)' : 'none',
+                              outlineOffset: -1,
+                              opacity: draggingIndex === index ? 0.5 : 1,
+                              transform: 'scale(1)',
                             }}
                             onClick={() => {
                               stopPlayback();
-                              setSelectedFrameIndex(index + 20);
-                              playbackStateRef.current.frameIndex = index + 20;
+                              setSelectedFrameIndex(index);
+                              playbackStateRef.current.frameIndex = index;
                             }}
                           >
                             <div className="relative">
                               {frame.canvas && (
                                 <img
-                                  src={frame.canvas.toDataURL()}
-                                  alt={`Frame ${index + 21}`}
+                                  src={frameDataUrls[index] || ''}
+                                  alt={`Frame ${index + 1}`}
                                   className="w-full aspect-square object-cover"
                                   draggable={false}
                                 />
                               )}
-                              {/* 操作按钮组 */}
+                              <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-tl">{index + 1}</div>
                               <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {/* 下载按钮 */}
-                                <button
+                                <motion.button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    downloadFrame(frame, index + 20);
+                                    downloadFrame(frame, index);
                                   }}
+                                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} transition={springFast}
                                   className="p-1 rounded"
                                   style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: '#ffffff' }}
                                   title="下载帧"
                                 >
                                   <Download className="w-3 h-3" />
-                                </button>
-                                {/* 删除按钮 */}
-                                <button
+                                </motion.button>
+                                <motion.button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     stopPlayback();
-                                    removeFrame(index + 20);
+                                    removeFrame(index);
                                   }}
                                   disabled={frames.length <= 1}
+                                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} transition={springFast}
                                   className="p-1 rounded disabled:opacity-30"
                                   style={{ backgroundColor: 'var(--danger)', color: '#ffffff' }}
                                   title="删除帧"
                                 >
                                   <Trash2 className="w-3 h-3" />
-                                </button>
+                                </motion.button>
                               </div>
-                            </div>
-                            <div className="px-2 py-1 text-center flex items-center justify-center gap-1" style={{ backgroundColor: 'var(--text-primary)' }}>
-                              <GripVertical className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                              <span className="text-xs text-white">
-                                {index + 21}
-                              </span>
                             </div>
                           </motion.div>
                         ))}
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    </div>
+              </div>
 
-                <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
                   提示：拖动帧可改变顺序，点击帧选中，悬停显示操作按钮
-                  {frames.length > 20 && `（共 ${frames.length} 帧，折叠显示前 20 帧）`}
                 </p>
               </div>
-            </div>
-
-            {/* 右侧：编辑工具 */}
-            <div className="space-y-4">
-              {/* 速度控制 */}
-              <div className="glass rounded-2xl p-4 space-y-4">
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>播放速度</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {[0.25, 0.5, 1, 2, 4, 8].map((speed) => (
-                    <button
-                      key={speed}
-                      onClick={() => {
-                        setPlaybackSpeed(speed);
-                        // 如果正在播放，重启以应用新速度
-                        if (playbackStateRef.current.isPlaying) {
-                          stopPlayback();
-                          setTimeout(() => startPlayback(), 0);
-                        }
-                      }}
-                      className="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                      style={{
-                        backgroundColor: playbackSpeed === speed ? 'var(--primary)' : 'var(--button-bg)',
-                        color: playbackSpeed === speed ? '#ffffff' : 'var(--text-secondary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (playbackSpeed !== speed) {
-                          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
-                          (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (playbackSpeed !== speed) {
-                          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)';
-                          (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
-                        }
-                      }}
-                    >
-                      {speed}x
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 全局操作 */}
-              <div className="glass rounded-2xl p-4 space-y-4">
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>全局操作</h3>
-                <button
-                  onClick={() => {
-                    stopPlayback();
-                    reset();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
-                  style={{
-                    backgroundColor: 'var(--button-bg)',
-                    color: 'var(--text-primary)',
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)'; }}
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  重置所有
-                </button>
-              </div>
-            </div>
           </div>
         )}
 

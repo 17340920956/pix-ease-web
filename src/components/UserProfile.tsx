@@ -16,6 +16,8 @@ import {
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDropdown } from '@/hooks/useDropdown';
 
+const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
+
 export default function UserProfile() {
   const { user, updateUser, logout } = useAuthStore();
   const { isOpen, toggle, close, ref } = useDropdown();
@@ -54,9 +56,12 @@ export default function UserProfile() {
     <>
       {/* 用户信息按钮 */}
       <div className="relative" ref={ref}>
-        <button
+        <motion.button
           onClick={toggle}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.96 }}
+          transition={springFast}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors"
           style={{
             backgroundColor: 'var(--button-bg)',
             color: 'var(--text-primary)',
@@ -78,7 +83,7 @@ export default function UserProfile() {
           <ChevronDown
             className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           />
-        </button>
+        </motion.button>
 
         {/* 下拉菜单 */}
         <AnimatePresence>
@@ -106,11 +111,14 @@ export default function UserProfile() {
 
               {/* 菜单项 */}
               <div className="p-1">
-                <button
+                <motion.button
                   onClick={() => {
                     close();
                     setShowEditModal(true);
                   }}
+                  whileHover={{ scale: 1.02, x: 2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springFast}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
                   style={{ color: 'var(--text-primary)' }}
                   onMouseEnter={(e) => {
@@ -122,13 +130,16 @@ export default function UserProfile() {
                 >
                   <Settings className="w-4 h-4" />
                   个人设置
-                </button>
+                </motion.button>
 
-                <button
+                <motion.button
                   onClick={() => {
                     close();
                     logout();
                   }}
+                  whileHover={{ scale: 1.02, x: 2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springFast}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
                   style={{ color: 'var(--danger)' }}
                   onMouseEnter={(e) => {
@@ -140,7 +151,7 @@ export default function UserProfile() {
                 >
                   <LogOut className="w-4 h-4" />
                   退出登录
-                </button>
+                </motion.button>
               </div>
             </motion.div>
           )}
@@ -175,15 +186,18 @@ export default function UserProfile() {
                 <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
                   个人设置
                 </h3>
-                <button
+                <motion.button
                   onClick={() => setShowEditModal(false)}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={springFast}
                   className="p-2 rounded-lg transition-colors"
                   style={{ color: 'var(--text-muted)' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)'; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </motion.button>
               </div>
 
               {/* 表单字段 */}
@@ -270,8 +284,11 @@ export default function UserProfile() {
 
               {/* 操作按钮 */}
               <div className="flex gap-3 pt-2">
-                <button
+                <motion.button
                   onClick={() => setShowEditModal(false)}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={springFast}
                   className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
                   style={{
                     backgroundColor: 'var(--button-bg)',
@@ -281,9 +298,12 @@ export default function UserProfile() {
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)'; }}
                 >
                   取消
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   onClick={handleSave}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.94 }}
+                  transition={springFast}
                   className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors flex items-center justify-center gap-2"
                   style={{ backgroundColor: 'var(--primary)' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.9'; }}
@@ -291,7 +311,7 @@ export default function UserProfile() {
                 >
                   <Check className="w-4 h-4" />
                   保存
-                </button>
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>

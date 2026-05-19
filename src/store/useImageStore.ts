@@ -163,7 +163,7 @@ export const useImageStore = create<ImageState>((set) => ({
   compressQuality: 'high',
   customQuality: 80,
   pixelSize: 8,
-  pixelStyle: 'ascii-bw',
+  pixelStyle: 'pixel',
   asciiPreset: 'default',
   asciiCustomChars: '',
   asciiWidth: 120,
@@ -204,7 +204,16 @@ export const useImageStore = create<ImageState>((set) => ({
         img.id === id ? { ...img, ...updates } : img
       ),
     })),
-  setProcessType: (type) => set({ processType: type }),
+  setProcessType: (type) =>
+    set((state) => {
+      const updates: Partial<ImageState> = { processType: type };
+      if (type === 'pixelate') {
+        updates.pixelStyle = 'pixel';
+      } else if (type === 'ascii') {
+        updates.pixelStyle = 'ascii-bw';
+      }
+      return { ...state, ...updates };
+    }),
   setTargetFormat: (format) => set({ targetFormat: format }),
   setCompressQuality: (quality) => set({ compressQuality: quality }),
   setCustomQuality: (quality) => set({ customQuality: quality }),
@@ -232,7 +241,7 @@ export const useImageStore = create<ImageState>((set) => ({
         compressQuality: 'high',
         customQuality: 80,
         pixelSize: 8,
-        pixelStyle: 'ascii-bw',
+        pixelStyle: 'pixel',
         asciiPreset: 'default',
         asciiCustomChars: '',
         asciiWidth: 120,

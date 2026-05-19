@@ -285,7 +285,7 @@ function PixelStudioContent() {
           }}
         >
           {/* 色卡 */}
-          <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--button-bg)' }}>
+          <div className="rounded-xl p-2" style={{ backgroundColor: 'var(--button-bg)' }}>
             <ColorPalette
               colors={store.palette}
               activeColor={store.color}

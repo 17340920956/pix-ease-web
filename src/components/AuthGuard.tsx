@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -12,33 +12,35 @@ import { useAuthStore } from '@/store/useAuthStore';
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // 如果未登录且不在加载状态，重定向到登录页
-    if (!isLoading && !isAuthenticated) {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated && !isLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [hydrated, isAuthenticated, isLoading, router]);
 
-  // 加载中或已登录时显示内容
-  if (isLoading) {
+  if (!hydrated || isLoading) {
     return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="glass rounded-2xl p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
+        <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}>
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-800 font-medium">加载中...</p>
+          <p style={{ color: 'var(--text-primary)' }}>加载中...</p>
         </div>
       </div>
     );
   }
 
-  // 未登录不渲染子组件（等待重定向）
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="glass rounded-2xl p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
+        <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}>
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-800 font-medium">正在跳转到登录页面...</p>
+          <p style={{ color: 'var(--text-primary)' }}>正在跳转到登录页面...</p>
         </div>
       </div>
     );
