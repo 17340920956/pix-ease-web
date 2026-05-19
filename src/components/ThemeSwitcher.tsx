@@ -1,29 +1,36 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, Eye, Palette } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Sun, Moon, Eye, Palette, ChevronDown, Check } from 'lucide-react';
 import { useThemeStore, type ThemeType } from '@/store/useThemeStore';
 
-/**
- * 主题切换器组件
- * 支持明亮、黑夜、护眼三种主题切换
- */
 export default function ThemeSwitcher() {
   const { theme, setTheme } = useThemeStore();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 点击外部关闭下拉菜单
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      setIsOpen(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen, handleClickOutside]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [isOpen]);
 
   const themeOptions: { value: ThemeType; label: string; icon: React.ReactNode }[] = [
     { value: 'light', label: '明亮', icon: <Sun className="w-4 h-4" /> },
@@ -37,33 +44,35 @@ export default function ThemeSwitcher() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
         style={{
           backgroundColor: 'var(--button-bg)',
-          color: 'var(--text-secondary)',
+          color: 'var(--text-primary)',
+          border: '1px solid var(--input-border)',
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
-          (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+          e.currentTarget.style.backgroundColor = 'var(--button-hover-bg)';
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)';
-          (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+          if (!isOpen) {
+            e.currentTarget.style.backgroundColor = 'var(--button-bg)';
+          }
         }}
         title="切换主题"
       >
         <Palette className="w-4 h-4" />
-        <span className="text-sm font-medium hidden sm:inline">{currentOption?.label}</span>
+        <span className="hidden sm:inline">{currentOption?.label}</span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {isOpen && (
         <div
-          className="absolute right-0 mt-2 w-36 rounded-xl overflow-hidden z-50"
+          className="absolute right-0 top-full mt-1 rounded-xl py-1 shadow-lg z-50 min-w-[140px]"
           style={{
-            backgroundColor: 'var(--glass-bg)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid var(--glass-border)',
-            boxShadow: 'var(--glass-shadow)',
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--border-color)',
           }}
         >
           {themeOptions.map((option) => (
@@ -73,14 +82,14 @@ export default function ThemeSwitcher() {
                 setTheme(option.value);
                 setIsOpen(false);
               }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors"
               style={{
-                color: theme === option.value ? 'var(--primary)' : 'var(--text-secondary)',
-                backgroundColor: theme === option.value ? 'var(--button-bg)' : 'transparent',
+                backgroundColor: theme === option.value ? 'var(--primary)' : 'transparent',
+                color: theme === option.value ? '#ffffff' : 'var(--text-primary)',
               }}
               onMouseEnter={(e) => {
                 if (theme !== option.value) {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)';
                 }
               }}
               onMouseLeave={(e) => {
@@ -89,19 +98,10 @@ export default function ThemeSwitcher() {
                 }
               }}
             >
-              <span
-                style={{
-                  color: theme === option.value ? 'var(--primary)' : 'var(--text-muted)',
-                }}
-              >
-                {option.icon}
-              </span>
+              {option.icon}
               <span className="font-medium">{option.label}</span>
               {theme === option.value && (
-                <span
-                  className="ml-auto w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: 'var(--primary)' }}
-                />
+                <Check className="w-3.5 h-3.5 ml-auto" />
               )}
             </button>
           ))}

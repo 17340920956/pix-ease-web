@@ -221,6 +221,7 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: 'pixease-theme',
+      partialize: (state) => ({ theme: state.theme }),
     }
   )
 );

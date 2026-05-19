@@ -10,6 +10,8 @@ import {
   Check,
   Mail,
   Phone,
+  FileText,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -26,6 +28,7 @@ export default function UserProfile() {
   // 编辑表单状态
   const [editForm, setEditForm] = useState({
     nickname: user?.nickname || '',
+    bio: user?.bio || '',
     phone: user?.phone || '',
   });
 
@@ -45,6 +48,7 @@ export default function UserProfile() {
     if (user) {
       setEditForm({
         nickname: user.nickname || '',
+        bio: user.bio || '',
         phone: user.phone || '',
       });
     }
@@ -60,6 +64,7 @@ export default function UserProfile() {
   const handleSave = () => {
     updateUser({
       nickname: editForm.nickname.trim() || undefined,
+      bio: editForm.bio.trim() || undefined,
       phone: editForm.phone.trim() || undefined,
     });
     setShowEditModal(false);
@@ -67,45 +72,50 @@ export default function UserProfile() {
 
   return (
     <>
-      {/* 用户信息按钮 - 无头像 */}
+      {/* 用户信息按钮 */}
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors"
-          style={{ backgroundColor: 'var(--button-bg)' }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+          style={{
+            backgroundColor: 'var(--button-bg)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--input-border)',
+          }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
+            e.currentTarget.style.backgroundColor = 'var(--button-hover-bg)';
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-bg)';
+            if (!isOpen) {
+              e.currentTarget.style.backgroundColor = 'var(--button-bg)';
+            }
           }}
         >
-          <User className="w-4 h-4" style={{ color: 'var(--primary)' }} />
-          <span className="text-sm font-medium hidden sm:inline max-w-[80px] truncate"
-            style={{ color: 'var(--text-primary)' }}
-          >
+          <User className="w-4 h-4" />
+          <span className="hidden sm:inline max-w-[80px] truncate">
             {displayName}
           </span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          />
         </button>
 
         {/* 下拉菜单 */}
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 mt-2 w-64 rounded-2xl overflow-hidden z-50"
+              className="absolute right-0 top-full mt-1 w-56 rounded-xl overflow-hidden z-50"
               style={{
-                backgroundColor: 'var(--glass-bg)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid var(--glass-border)',
-                boxShadow: 'var(--glass-shadow)',
+                backgroundColor: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
               }}
             >
-              {/* 用户信息头部 - 无头像 */}
-              <div className="p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
+              {/* 用户信息头部 */}
+              <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                   {displayName}
                 </p>
@@ -115,21 +125,19 @@ export default function UserProfile() {
               </div>
 
               {/* 菜单项 */}
-              <div className="p-2 space-y-1">
+              <div className="p-1">
                 <button
                   onClick={() => {
                     setIsOpen(false);
                     setShowEditModal(true);
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors"
-                  style={{ color: 'var(--text-secondary)' }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+                  style={{ color: 'var(--text-primary)' }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+                    e.currentTarget.style.backgroundColor = 'var(--button-bg)';
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
                   <Settings className="w-4 h-4" />
@@ -141,13 +149,13 @@ export default function UserProfile() {
                     setIsOpen(false);
                     logout();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
                   style={{ color: 'var(--danger)' }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--button-hover-bg)';
+                    e.currentTarget.style.backgroundColor = 'var(--button-bg)';
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
                   <LogOut className="w-4 h-4" />
@@ -259,6 +267,25 @@ export default function UserProfile() {
                   />
                 </div>
 
+                {/* 个人简介 */}
+                <div>
+                  <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    <FileText className="w-4 h-4" />
+                    个人简介
+                  </label>
+                  <textarea
+                    value={editForm.bio}
+                    onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                    placeholder="介绍一下你自己..."
+                    rows={3}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none resize-none transition-colors"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--input-border)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                </div>
               </div>
 
               {/* 操作按钮 */}

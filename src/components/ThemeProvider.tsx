@@ -12,10 +12,13 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   const { theme, resolvedTheme, setTheme, syncWithSystem } = useThemeStore();
 
   useEffect(() => {
-    // 初始化时解析 auto 主题
+    // 根据当前 theme 解析并同步 resolvedTheme
+    // 依赖 theme 可确保 persist 恢复后或用户切换时都能正确解析
     const resolved = resolveTheme(theme);
     useThemeStore.setState({ resolvedTheme: resolved });
+  }, [theme]);
 
+  useEffect(() => {
     // 监听系统主题变化
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
@@ -24,7 +27,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
+  }, [syncWithSystem]);
 
   useEffect(() => {
     // 在 html 元素上设置 data-theme 属性（使用解析后的主题）

@@ -17,11 +17,13 @@ import {
   Layers,
   MousePointerClick,
   LogOut,
-  User,
+  LogIn,
+  Palette,
 } from 'lucide-react';
 import Link from 'next/link';
 import SkyBackground from '@/app/components/SkyBackground';
 import { useAuthStore } from '@/store/useAuthStore';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 
 export default function Home() {
   const currentYear = new Date().getFullYear();
@@ -73,6 +75,15 @@ export default function Home() {
       bgColor: 'bg-violet-50/80',
       iconColor: 'text-violet-500',
     },
+    {
+      icon: <Palette className="w-6 h-6" />,
+      title: '像素工坊',
+      description: '像素画编辑器',
+      href: '/pixel-studio',
+      color: 'from-pink-400 to-rose-400',
+      bgColor: 'bg-pink-50/80',
+      iconColor: 'text-pink-500',
+    },
   ];
 
   const stats = [
@@ -119,21 +130,38 @@ export default function Home() {
             </span>
           </Link>
           <div className="flex items-center gap-3">
+            <ThemeSwitcher />
             {isAuthenticated ? (
               <button
-                onClick={logout}
-                className="flex items-center gap-1.5 px-5 py-2 text-sm font-medium text-white bg-[#ff3b30] hover:bg-[#ff453a] rounded-full transition-all"
+                onClick={() => logout()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  backgroundColor: 'var(--button-bg)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--input-border)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--button-hover-bg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--button-bg)';
+                }}
               >
                 <LogOut className="w-4 h-4" />
-                退出
+                <span>退出</span>
               </button>
             ) : (
               <Link
                 href="/login"
-                className="flex items-center gap-1.5 px-5 py-2 text-sm font-medium text-white bg-[#0071e3] hover:bg-[#0077ed] rounded-full transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  backgroundColor: 'var(--primary)',
+                  color: '#ffffff',
+                  border: '1px solid var(--primary)',
+                }}
               >
-                登录
-                <ArrowRight className="w-4 h-4" />
+                <LogIn className="w-4 h-4" />
+                <span>登录</span>
               </Link>
             )}
           </div>
@@ -166,8 +194,7 @@ export default function Home() {
                 className="px-8 py-3.5 bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-full font-medium text-base transition-all hover:scale-[1.02] shadow-lg shadow-blue-500/20 flex items-center gap-2"
               >
                 <Film className="w-5 h-5" />
-                GIF 编辑器
-                <ArrowRight className="w-4 h-4" />
+                GIF编辑
               </Link>
               <Link
                 href="/image-tool"

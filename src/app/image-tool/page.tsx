@@ -19,9 +19,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { useImageStore } from '@/store/useImageStore';
-import ThemeSwitcher from '@/components/ThemeSwitcher';
-import ToolNavSwitcher from '@/components/ToolNavSwitcher';
-import UserProfile from '@/components/UserProfile';
+import TopHeader from '@/components/TopHeader';
 import {
   convertImageFormat,
   compressImage,
@@ -379,6 +377,15 @@ function ImageToolContent() {
     }
   };
 
+  const getProcessTypeColor = (type: ProcessType) => {
+    switch (type) {
+      case 'convert': return '#9333ea';
+      case 'compress': return '#16a34a';
+      case 'pixelate': return '#ea580c';
+      case 'ascii': return '#db2777';
+    }
+  };
+
   /**
    * 计算压缩率
    */
@@ -390,32 +397,17 @@ function ImageToolContent() {
   return (
     <div className="min-h-screen gradient-bg">
       {/* 顶部导航 */}
-      <header className="glass border-b px-4 sm:px-6 py-4" style={{ borderColor: 'var(--border-color)' }}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* 左侧：切换按钮 + 主题 */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ToolNavSwitcher />
-            <ThemeSwitcher />
-          </div>
-          {/* 右侧：用户信息 + 操作按钮 */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {images.length > 0 && (
-              <button
-                onClick={clearImages}
-                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 transition-colors"
-                style={{ color: 'var(--danger)' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.8'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">清空</span>
-              </button>
-            )}
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--input-border)' }} />
-            <UserProfile />
-          </div>
-        </div>
-      </header>
+      <TopHeader>
+        {images.length > 0 && (
+          <button
+            onClick={clearImages}
+            className="flex items-center gap-1 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all text-sm font-medium active:scale-95"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>清空</span>
+          </button>
+        )}
+      </TopHeader>
 
       <div className="w-full max-w-[1920px] mx-auto p-4 lg:p-6 space-y-6">
         {/* 处理类型选择 */}
@@ -529,7 +521,13 @@ function ImageToolContent() {
                         exit={{ opacity: 0, scale: 0.9 }}
                         className="relative group"
                       >
-                        <div className="aspect-square rounded-xl overflow-hidden relative max-h-[280px]" style={{ backgroundColor: 'var(--button-bg)' }}>
+                        <div className={`aspect-square rounded-xl overflow-hidden relative max-h-[280px] ${image.status === 'completed' && image.processParams?.processType ? 'border-t-[3px]' : ''}`}
+                         style={{
+                           backgroundColor: 'var(--button-bg)',
+                           ...(image.status === 'completed' && image.processParams?.processType
+                             ? { borderTopColor: getProcessTypeColor(image.processParams.processType) }
+                             : {}),
+                         }}>
                           {/* 处理完成且不是ASCII模式：左右对比展示 */}
                           {image.status === 'completed' && image.processedUrl ? (
                             <div className="w-full h-full flex">
@@ -554,13 +552,15 @@ function ImageToolContent() {
                                   alt="Processed"
                                   className="w-full h-full object-cover"
                                 />
-                                <div className="absolute top-1 right-1 bg-blue-600/80 text-white text-[10px] px-1.5 py-0.5 rounded">
+                                <div className="absolute top-1 right-1 text-white text-[10px] px-1.5 py-0.5 rounded"
+                                  style={{ backgroundColor: image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) : '#3b82f6' }}>
                                   {image.processParams?.processType === 'convert' && '转换后'}
                                   {image.processParams?.processType === 'compress' && '压缩后'}
                                   {image.processParams?.processType === 'pixelate' && '像素化'}
                                   {image.processParams?.processType === 'ascii' && 'ASCII'}
                                 </div>
-                                <div className="absolute bottom-1 left-1 right-1 bg-blue-600/80 text-white text-[10px] px-1.5 py-0.5 rounded text-center">
+                                <div className="absolute bottom-1 left-1 right-1 text-white text-[10px] px-1.5 py-0.5 rounded text-center"
+                                 style={{ backgroundColor: image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) : '#3b82f6' }}>
                                   {formatFileSize(image.processedSize || 0)}
                                   {image.processParams?.processType === 'compress' && (
                                     <span className={`ml-1 ${getCompressionRate(image.originalSize, image.processedSize || 0) >= 0 ? 'text-green-200' : 'text-orange-200'}`}>
@@ -597,7 +597,14 @@ function ImageToolContent() {
                           )}
                           {/* 处理完成：显示详细对比信息 */}
                           {image.status === 'completed' && image.processedSize && (
-                            <div className="rounded-lg p-2 mt-2 space-y-1.5 border" style={{ backgroundColor: 'var(--button-bg)', borderColor: 'var(--input-border)' }}>
+                            <div className="rounded-lg p-2 mt-2 space-y-1.5 border-l-[3px] border"
+                              style={{
+                                backgroundColor: 'var(--button-bg)',
+                                borderColor: 'var(--input-border)',
+                                ...(image.processParams?.processType
+                                  ? { borderLeftColor: getProcessTypeColor(image.processParams.processType) }
+                                  : {}),
+                              }}>
                               <div className="flex items-center justify-between text-xs">
                                 <span style={{ color: 'var(--text-muted)' }}>处理前</span>
                                 <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{formatFileSize(image.originalSize)}</span>
@@ -660,8 +667,8 @@ function ImageToolContent() {
                                       processParams: undefined,
                                     });
                                   }}
-                                  className="px-2 py-1.5 text-white rounded text-xs transition-colors"
-                                  style={{ backgroundColor: 'var(--secondary)' }}
+                                  className="flex-1 px-2 py-1.5 text-white rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  style={{ backgroundColor: 'var(--warning)' }}
                                   title="重置为未处理状态"
                                 >
                                   重置

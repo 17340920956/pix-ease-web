@@ -11,7 +11,6 @@ import {
   SkipForward,
   Download,
   Trash2,
-  Settings,
   RotateCcw,
   GripVertical,
   ChevronDown,
@@ -21,9 +20,7 @@ import {
 import { useGifStore } from '@/store/useGifStore';
 import { parseGifFileAdvanced, generateGifBlob, downloadFile, reverseFrames } from '@/lib/gifUtils';
 import AuthGuard from '@/components/AuthGuard';
-import ThemeSwitcher from '@/components/ThemeSwitcher';
-import ToolNavSwitcher from '@/components/ToolNavSwitcher';
-import UserProfile from '@/components/UserProfile';
+import TopHeader from '@/components/TopHeader';
 import type { GifFrame } from '@/store/useGifStore';
 
 /**
@@ -47,14 +44,12 @@ function GifEditorContent() {
     frames,
     selectedFrameIndex,
     playbackSpeed,
-    showSettings,
     framesExpanded,
     addFrames,
     removeFrame,
     reorderFrames,
     setSelectedFrameIndex,
     setPlaybackSpeed,
-    setShowSettings,
     setFramesExpanded,
     reset,
   } = useGifStore();
@@ -317,41 +312,16 @@ function GifEditorContent() {
   return (
     <div className="min-h-screen gradient-bg">
       {/* 顶部导航 */}
-      <header className="glass border-b px-4 sm:px-6 py-4" style={{ borderColor: 'var(--border-color)' }}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* 左侧：切换按钮 + 主题 */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ToolNavSwitcher />
-            <ThemeSwitcher />
-          </div>
-          {/* 右侧：用户信息 + 操作按钮 */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="p-2 glass rounded-lg transition-colors"
-              style={{ color: 'var(--text-secondary)' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleExport}
-              disabled={frames.length === 0 || isProcessing}
-              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg transition-colors"
-              style={{
-                backgroundColor: frames.length === 0 || isProcessing ? 'var(--text-muted)' : 'var(--primary)',
-                color: '#ffffff',
-              }}
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">导出 GIF</span>
-            </button>
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--input-border)' }} />
-            <UserProfile />
-          </div>
-        </div>
-      </header>
+      <TopHeader>
+        <button
+          onClick={handleExport}
+          disabled={frames.length === 0 || isProcessing}
+          className="flex items-center gap-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all text-sm font-medium"
+        >
+          <Download className="w-4 h-4" />
+          <span>导出 GIF</span>
+        </button>
+      </TopHeader>
 
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* 上传区域 */}
