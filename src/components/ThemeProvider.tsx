@@ -9,7 +9,7 @@ import { useThemeStore, resolveTheme } from '@/store/useThemeStore';
  * 监听系统主题变化并动态更新
  */
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { theme, resolvedTheme, setTheme, syncWithSystem } = useThemeStore();
+  const { theme, resolvedTheme } = useThemeStore();
 
   useEffect(() => {
     // 根据当前 theme 解析并同步 resolvedTheme
@@ -19,15 +19,14 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   }, [theme]);
 
   useEffect(() => {
-    // 监听系统主题变化
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      syncWithSystem();
+      useThemeStore.getState().syncWithSystem();
     };
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [syncWithSystem]);
+  }, []);
 
   useEffect(() => {
     // 在 html 元素上设置 data-theme 属性（使用解析后的主题）

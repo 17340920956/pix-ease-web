@@ -1,49 +1,25 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
 import { Sun, Moon, Eye, Palette, ChevronDown, Check } from 'lucide-react';
 import { useThemeStore, type ThemeType } from '@/store/useThemeStore';
+import { useDropdown } from '@/hooks/useDropdown';
+
+const themeOptions: { value: ThemeType; label: string; icon: React.ReactNode }[] = [
+  { value: 'light', label: '明亮', icon: <Sun className="w-4 h-4" /> },
+  { value: 'dark', label: '黑夜', icon: <Moon className="w-4 h-4" /> },
+  { value: 'eye-care', label: '护眼', icon: <Eye className="w-4 h-4" /> },
+];
 
 export default function ThemeSwitcher() {
   const { theme, setTheme } = useThemeStore();
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-      setIsOpen(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isOpen, handleClickOutside]);
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
-    };
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-      return () => document.removeEventListener('keydown', handleEsc);
-    }
-  }, [isOpen]);
-
-  const themeOptions: { value: ThemeType; label: string; icon: React.ReactNode }[] = [
-    { value: 'light', label: '明亮', icon: <Sun className="w-4 h-4" /> },
-    { value: 'dark', label: '黑夜', icon: <Moon className="w-4 h-4" /> },
-    { value: 'eye-care', label: '护眼', icon: <Eye className="w-4 h-4" /> },
-  ];
+  const { isOpen, toggle, close, ref } = useDropdown();
 
   const currentOption = themeOptions.find((opt) => opt.value === theme);
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" ref={ref}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggle}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
         style={{
           backgroundColor: 'var(--button-bg)',
@@ -80,7 +56,7 @@ export default function ThemeSwitcher() {
               key={option.value}
               onClick={() => {
                 setTheme(option.value);
-                setIsOpen(false);
+                close();
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors"
               style={{

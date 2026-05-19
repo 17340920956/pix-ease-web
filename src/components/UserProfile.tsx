@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -14,36 +14,19 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useDropdown } from '@/hooks/useDropdown';
 
-/**
- * 用户信息展示与编辑组件
- * 包含用户信息展示和编辑功能（无头像）
- */
 export default function UserProfile() {
   const { user, updateUser, logout } = useAuthStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, toggle, close, ref } = useDropdown();
   const [showEditModal, setShowEditModal] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 编辑表单状态
   const [editForm, setEditForm] = useState({
     nickname: user?.nickname || '',
     bio: user?.bio || '',
     phone: user?.phone || '',
   });
 
-  // 点击外部关闭下拉菜单
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // 同步编辑表单
   useEffect(() => {
     if (user) {
       setEditForm({
@@ -58,9 +41,6 @@ export default function UserProfile() {
 
   const displayName = user.nickname || user.username || '用户';
 
-  /**
-   * 保存用户信息
-   */
   const handleSave = () => {
     updateUser({
       nickname: editForm.nickname.trim() || undefined,
@@ -73,9 +53,9 @@ export default function UserProfile() {
   return (
     <>
       {/* 用户信息按钮 */}
-      <div className="relative" ref={dropdownRef}>
+      <div className="relative" ref={ref}>
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={toggle}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
           style={{
             backgroundColor: 'var(--button-bg)',
@@ -128,7 +108,7 @@ export default function UserProfile() {
               <div className="p-1">
                 <button
                   onClick={() => {
-                    setIsOpen(false);
+                    close();
                     setShowEditModal(true);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
@@ -146,7 +126,7 @@ export default function UserProfile() {
 
                 <button
                   onClick={() => {
-                    setIsOpen(false);
+                    close();
                     logout();
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"

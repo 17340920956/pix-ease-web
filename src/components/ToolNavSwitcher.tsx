@@ -2,8 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useRef, useState, useEffect, useCallback } from 'react';
 import { Image as ImageIcon, Film, Grid3x3, ChevronDown } from 'lucide-react';
+import { useDropdown } from '@/hooks/useDropdown';
 
 interface ToolItem {
   href: string;
@@ -12,61 +12,42 @@ interface ToolItem {
   active: boolean;
 }
 
+const tools: ToolItem[] = [
+  {
+    href: '/image-tool',
+    label: '图片处理',
+    icon: <ImageIcon className="w-4 h-4" />,
+    active: false,
+  },
+  {
+    href: '/gif-editor',
+    label: 'GIF 编辑',
+    icon: <Film className="w-4 h-4" />,
+    active: false,
+  },
+  {
+    href: '/pixel-studio',
+    label: '像素工坊',
+    icon: <Grid3x3 className="w-4 h-4" />,
+    active: false,
+  },
+];
+
 export default function ToolNavSwitcher() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { isOpen, toggle, close, ref } = useDropdown();
 
-  const tools: ToolItem[] = [
-    {
-      href: '/image-tool',
-      label: '图片处理',
-      icon: <ImageIcon className="w-4 h-4" />,
-      active: pathname === '/image-tool' || pathname?.startsWith('/image-tool'),
-    },
-    {
-      href: '/gif-editor',
-      label: 'GIF 编辑',
-      icon: <Film className="w-4 h-4" />,
-      active: pathname === '/gif-editor' || pathname?.startsWith('/gif-editor'),
-    },
-    {
-      href: '/pixel-studio',
-      label: '像素工坊',
-      icon: <Grid3x3 className="w-4 h-4" />,
-      active: pathname === '/pixel-studio' || pathname?.startsWith('/pixel-studio'),
-    },
-  ];
+  const resolvedTools: ToolItem[] = tools.map((t) => ({
+    ...t,
+    active: pathname === t.href || pathname?.startsWith(`${t.href}?`) || false,
+  }));
 
-  const activeTool = tools.find((t) => t.active) || tools[0];
-
-  const handleClickOutside = useCallback((e: MouseEvent) => {
-    if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-      setOpen(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [open, handleClickOutside]);
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    if (open) {
-      document.addEventListener('keydown', handleEsc);
-      return () => document.removeEventListener('keydown', handleEsc);
-    }
-  }, [open]);
+  const activeTool = resolvedTools.find((t) => t.active) || resolvedTools[0];
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={ref} className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
         style={{
           backgroundColor: 'var(--button-bg)',
@@ -77,7 +58,7 @@ export default function ToolNavSwitcher() {
           e.currentTarget.style.backgroundColor = 'var(--button-hover-bg)';
         }}
         onMouseLeave={(e) => {
-          if (!open) {
+          if (!isOpen) {
             e.currentTarget.style.backgroundColor = 'var(--button-bg)';
           }
         }}
@@ -85,11 +66,11 @@ export default function ToolNavSwitcher() {
         {activeTool.icon}
         <span className="hidden sm:inline">{activeTool.label}</span>
         <ChevronDown
-          className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
-      {open && (
+      {isOpen && (
         <div
           className="absolute right-0 top-full mt-1 rounded-xl py-1 shadow-lg z-50 min-w-[140px]"
           style={{
@@ -97,11 +78,11 @@ export default function ToolNavSwitcher() {
             border: '1px solid var(--border-color)',
           }}
         >
-          {tools.map((tool) => (
+          {resolvedTools.map((tool) => (
             <Link
               key={tool.href}
               href={tool.href}
-              onClick={() => setOpen(false)}
+              onClick={close}
               className="flex items-center gap-2 px-3 py-2 text-sm transition-colors"
               style={{
                 backgroundColor: tool.active ? 'var(--primary)' : 'transparent',

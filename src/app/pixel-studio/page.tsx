@@ -23,6 +23,9 @@ export default function PixelStudioPage() {
 function PixelStudioContent() {
   const store = usePixelStore();
   const exportCanvasRef = useRef<HTMLCanvasElement>(null);
+  const primaryColorRef = useRef<HTMLInputElement>(null);
+  const secondaryColorRef = useRef<HTMLInputElement>(null);
+  const bgColorRef = useRef<HTMLInputElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [canvasW, setCanvasW] = useState(String(store.project.width));
   const [canvasH, setCanvasH] = useState(String(store.project.height));
@@ -242,6 +245,10 @@ function PixelStudioContent() {
         onRedo={store.redo}
       />
 
+      <input ref={primaryColorRef} type="color" className="hidden" value={store.color} onChange={(e) => store.setColor(e.target.value)} />
+      <input ref={secondaryColorRef} type="color" className="hidden" value={store.secondaryColor} onChange={(e) => store.setSecondaryColor(e.target.value)} />
+      <input ref={bgColorRef} type="color" className="hidden" value={store.project.backgroundColor} onChange={(e) => store.setProjectSettings({ backgroundColor: e.target.value })} />
+
       {/* 主体：左侧工具栏 + 中间画布 + 右侧面板 */}
       <div className="flex-1 flex relative" style={{ overflow: 'hidden' }}>
         {/* 左侧工具栏 */}
@@ -300,27 +307,15 @@ function PixelStudioContent() {
                   <div
                     className="w-6 h-6 rounded border-2 cursor-pointer"
                     style={{ backgroundColor: store.color, borderColor: 'var(--input-border)' }}
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'color';
-                      input.value = store.color;
-                      input.onchange = (e) => store.setColor((e.target as HTMLInputElement).value);
-                      input.click();
-                    }}
+                    onClick={() => primaryColorRef.current?.click()}
                   />
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>主色</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div
                     className="w-6 h-6 rounded border-2 cursor-pointer"
-                    style={{ backgroundColor: store.secondaryColor, borderColor: 'var(--input-border)' }}
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'color';
-                      input.value = store.secondaryColor;
-                      input.onchange = (e) => store.setSecondaryColor((e.target as HTMLInputElement).value);
-                      input.click();
-                    }}
+                      style={{ backgroundColor: store.secondaryColor, borderColor: 'var(--input-border)' }}
+                      onClick={() => secondaryColorRef.current?.click()}
                   />
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>副色</span>
                 </div>
@@ -342,14 +337,7 @@ function PixelStudioContent() {
                     borderColor: 'var(--input-border)',
                   }}
                   title="点击更换背景色"
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'color';
-                    input.value = store.project.backgroundColor;
-                    input.onchange = (e) =>
-                      store.setProjectSettings({ backgroundColor: (e.target as HTMLInputElement).value });
-                    input.click();
-                  }}
+                    onClick={() => bgColorRef.current?.click()}
                 />
                 <button
                   onClick={() => store.setProjectSettings({ backgroundColor: '#ffffff' })}

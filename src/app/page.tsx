@@ -25,94 +25,95 @@ import SkyBackground from '@/app/components/SkyBackground';
 import { useAuthStore } from '@/store/useAuthStore';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
+const currentYear = new Date().getFullYear();
+
+const features = [
+  {
+    icon: <Film className="w-6 h-6" />,
+    title: 'GIF 编辑器',
+    description: '拆帧、合并、压缩、倒放',
+    href: '/gif-editor',
+    color: 'from-rose-400 to-orange-400',
+    bgColor: 'bg-rose-50/80',
+    iconColor: 'text-rose-500',
+  },
+  {
+    icon: <FileType className="w-6 h-6" />,
+    title: '格式转换',
+    description: 'JPG、PNG、WEBP、AVIF',
+    href: '/image-tool?type=convert',
+    color: 'from-blue-400 to-cyan-400',
+    bgColor: 'bg-blue-50/80',
+    iconColor: 'text-blue-500',
+  },
+  {
+    icon: <Minimize2 className="w-6 h-6" />,
+    title: '图片压缩',
+    description: '智能压缩，保持画质',
+    href: '/image-tool?type=compress',
+    color: 'from-emerald-400 to-teal-400',
+    bgColor: 'bg-emerald-50/80',
+    iconColor: 'text-emerald-500',
+  },
+  {
+    icon: <Grid3x3 className="w-6 h-6" />,
+    title: '像素风格',
+    description: '像素风、GameBoy 风格',
+    href: '/image-tool?type=pixelate',
+    color: 'from-amber-400 to-yellow-400',
+    bgColor: 'bg-amber-50/80',
+    iconColor: 'text-amber-500',
+  },
+  {
+    icon: <Type className="w-6 h-6" />,
+    title: 'ASCII 艺术',
+    description: '字符画转换',
+    href: '/image-tool?type=ascii',
+    color: 'from-violet-400 to-purple-400',
+    bgColor: 'bg-violet-50/80',
+    iconColor: 'text-violet-500',
+  },
+  {
+    icon: <Palette className="w-6 h-6" />,
+    title: '像素工坊',
+    description: '像素画编辑器',
+    href: '/pixel-studio',
+    color: 'from-pink-400 to-rose-400',
+    bgColor: 'bg-pink-50/80',
+    iconColor: 'text-pink-500',
+  },
+];
+
+const stats = [
+  { value: '100%', label: '本地处理', icon: <Shield className="w-5 h-5" /> },
+  { value: '0', label: '数据上传', icon: <Lock className="w-5 h-5" /> },
+  { value: '50+', label: '支持格式', icon: <Layers className="w-5 h-5" /> },
+  { value: '免费', label: '完全免费', icon: <Heart className="w-5 h-5" /> },
+];
+
+const highlights = [
+  {
+    icon: <Shield className="w-7 h-7" />,
+    title: '隐私保护',
+    description: '所有处理都在浏览器本地完成，图片不会上传到任何服务器',
+    color: 'from-emerald-400 to-teal-400',
+  },
+  {
+    icon: <Zap className="w-7 h-7" />,
+    title: '极速处理',
+    description: '采用 WebAssembly 技术，处理速度媲美原生应用',
+    color: 'from-amber-400 to-orange-400',
+  },
+  {
+    icon: <MousePointerClick className="w-7 h-7" />,
+    title: '简单易用',
+    description: '直观的操作界面，无需专业知识即可上手使用',
+    color: 'from-blue-400 to-indigo-400',
+  },
+];
+
 export default function Home() {
-  const currentYear = new Date().getFullYear();
   const { isAuthenticated, logout } = useAuthStore();
-
-  const features = [
-    {
-      icon: <Film className="w-6 h-6" />,
-      title: 'GIF 编辑器',
-      description: '拆帧、合并、压缩、倒放',
-      href: '/gif-editor',
-      color: 'from-rose-400 to-orange-400',
-      bgColor: 'bg-rose-50/80',
-      iconColor: 'text-rose-500',
-    },
-    {
-      icon: <FileType className="w-6 h-6" />,
-      title: '格式转换',
-      description: 'JPG、PNG、WEBP、AVIF',
-      href: '/image-tool?type=convert',
-      color: 'from-blue-400 to-cyan-400',
-      bgColor: 'bg-blue-50/80',
-      iconColor: 'text-blue-500',
-    },
-    {
-      icon: <Minimize2 className="w-6 h-6" />,
-      title: '图片压缩',
-      description: '智能压缩，保持画质',
-      href: '/image-tool?type=compress',
-      color: 'from-emerald-400 to-teal-400',
-      bgColor: 'bg-emerald-50/80',
-      iconColor: 'text-emerald-500',
-    },
-    {
-      icon: <Grid3x3 className="w-6 h-6" />,
-      title: '像素风格',
-      description: '像素风、GameBoy 风格',
-      href: '/image-tool?type=pixelate',
-      color: 'from-amber-400 to-yellow-400',
-      bgColor: 'bg-amber-50/80',
-      iconColor: 'text-amber-500',
-    },
-    {
-      icon: <Type className="w-6 h-6" />,
-      title: 'ASCII 艺术',
-      description: '字符画转换',
-      href: '/image-tool?type=ascii',
-      color: 'from-violet-400 to-purple-400',
-      bgColor: 'bg-violet-50/80',
-      iconColor: 'text-violet-500',
-    },
-    {
-      icon: <Palette className="w-6 h-6" />,
-      title: '像素工坊',
-      description: '像素画编辑器',
-      href: '/pixel-studio',
-      color: 'from-pink-400 to-rose-400',
-      bgColor: 'bg-pink-50/80',
-      iconColor: 'text-pink-500',
-    },
-  ];
-
-  const stats = [
-    { value: '100%', label: '本地处理', icon: <Shield className="w-5 h-5" /> },
-    { value: '0', label: '数据上传', icon: <Lock className="w-5 h-5" /> },
-    { value: '50+', label: '支持格式', icon: <Layers className="w-5 h-5" /> },
-    { value: '免费', label: '完全免费', icon: <Heart className="w-5 h-5" /> },
-  ];
-
-  const highlights = [
-    {
-      icon: <Shield className="w-7 h-7" />,
-      title: '隐私保护',
-      description: '所有处理都在浏览器本地完成，图片不会上传到任何服务器',
-      color: 'from-emerald-400 to-teal-400',
-    },
-    {
-      icon: <Zap className="w-7 h-7" />,
-      title: '极速处理',
-      description: '采用 WebAssembly 技术，处理速度媲美原生应用',
-      color: 'from-amber-400 to-orange-400',
-    },
-    {
-      icon: <MousePointerClick className="w-7 h-7" />,
-      title: '简单易用',
-      description: '直观的操作界面，无需专业知识即可上手使用',
-      color: 'from-blue-400 to-indigo-400',
-    },
-  ];
 
   return (
     <div className="min-h-screen gradient-bg relative">
