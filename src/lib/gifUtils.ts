@@ -293,14 +293,50 @@ export async function generateGifBlob(
 ): Promise<Blob> {
   const GIF = (await import('gif.js')).default;
 
+  const firstCanvas = frames.find((f) => f.canvas)?.canvas;
+  const outW = firstCanvas?.width || 0;
+  const outH = firstCanvas?.height || 0;
+  if (!outW || !outH) {
+    throw new Error('No valid frame canvas found');
+  }
+
+  const normalized: (HTMLCanvasElement | null)[] = [];
+  for (const frame of frames) {
+    if (!frame.canvas) {
+      normalized.push(null);
+      continue;
+    }
+    if (frame.canvas.width === outW && frame.canvas.height === outH) {
+      normalized.push(frame.canvas);
+      continue;
+    }
+
+    const c = document.createElement('canvas');
+    c.width = outW;
+    c.height = outH;
+    const ctx = c.getContext('2d')!;
+    ctx.imageSmoothingQuality = 'high';
+
+    const scale = Math.min(outW / frame.canvas.width, outH / frame.canvas.height);
+    const dw = Math.round(frame.canvas.width * scale);
+    const dh = Math.round(frame.canvas.height * scale);
+    const dx = Math.round((outW - dw) / 2);
+    const dy = Math.round((outH - dh) / 2);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.drawImage(frame.canvas, dx, dy, dw, dh);
+    normalized.push(c);
+  }
+
   return new Promise((resolve, reject) => {
     let settled = false;
 
     const gif = new GIF({
-      workers: 2,
+      workers: Math.max(2, navigator.hardwareConcurrency || 4),
       quality: 10,
-      width: frames[0]?.canvas?.width || 300,
-      height: frames[0]?.canvas?.height || 300,
+      width: outW,
+      height: outH,
       workerScript: '/gif.worker.js',
     });
 
@@ -332,9 +368,9 @@ export async function generateGifBlob(
       reject(error);
     });
 
-    frames.forEach((frame) => {
-      if (frame.canvas) {
-        gif.addFrame(frame.canvas, { delay: frame.delay });
+    normalized.forEach((canvas, i) => {
+      if (canvas) {
+        gif.addFrame(canvas, { delay: frames[i].delay });
       }
     });
 

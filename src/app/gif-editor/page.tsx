@@ -73,6 +73,18 @@ function GifEditorContent() {
   const loopRef = useRef(false);
 
   /**
+   * 读取文件为图片
+   */
+  const readFileAsImage = (file: File): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  /**
    * 处理 GIF 文件上传
    */
   const handleFileUpload = useCallback(
@@ -126,7 +138,7 @@ function GifEditorContent() {
             id: crypto.randomUUID(),
             canvas,
             imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-            delay: 100, // 默认 100ms
+            delay: 100,
           });
 
           setProgress(Math.round(((i + 1) / totalFiles) * 100));
@@ -143,18 +155,6 @@ function GifEditorContent() {
     },
     [addFrames]
   );
-
-  /**
-   * 读取文件为图片
-   */
-  const readFileAsImage = (file: File): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
-  };
 
   /**
    * 导出 GIF
