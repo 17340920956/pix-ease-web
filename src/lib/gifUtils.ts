@@ -291,10 +291,11 @@ export async function generateGifBlob(
   frames: GifFrame[],
   onProgress?: (progress: number) => void
 ): Promise<Blob> {
-  // 动态导入 gif.js 以避免 SSR 问题
   const GIF = (await import('gif.js')).default;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+
     const gif = new GIF({
       workers: 2,
       quality: 10,
@@ -303,7 +304,19 @@ export async function generateGifBlob(
       workerScript: '/gif.worker.js',
     });
 
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        gif.abort();
+        gif.freeWorkers();
+        reject(new Error('GIF 生成超时，请重试'));
+      }
+    }, 60000);
+
     gif.on('finished', (blob: Blob) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       if (onProgress) onProgress(100);
       resolve(blob);
     });
@@ -313,6 +326,9 @@ export async function generateGifBlob(
     });
 
     gif.on('error', (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       reject(error);
     });
 

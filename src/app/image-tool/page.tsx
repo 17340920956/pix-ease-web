@@ -401,18 +401,7 @@ function ImageToolContent() {
   return (
     <div className="min-h-screen gradient-bg">
       {/* 顶部导航 */}
-      <TopHeader>
-        {images.length > 0 && (
-          <motion.button
-            onClick={clearImages}
-            whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
-            className="flex items-center gap-1 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all text-sm font-medium"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>清空</span>
-          </motion.button>
-        )}
-      </TopHeader>
+      <TopHeader />
 
       <div className="w-full max-w-[1920px] mx-auto p-4 lg:p-6 space-y-6">
         {/* 处理类型选择 */}
@@ -1235,6 +1224,33 @@ function ImageToolContent() {
                 </div>
               )}
             </div>
+
+            {/* 清空按钮 */}
+            {images.length > 0 && (
+              <motion.button
+                onClick={clearImages}
+                whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)';
+                  e.currentTarget.style.borderColor = 'var(--danger)';
+                  e.currentTarget.style.color = 'var(--danger)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--card-bg)';
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+                清空全部
+              </motion.button>
+            )}
 
             {/* 统计信息 */}
             {images.length > 0 && (
