@@ -12,6 +12,8 @@ import {
   Phone,
   FileText,
   ChevronDown,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDropdown } from '@/hooks/useDropdown';
@@ -19,12 +21,14 @@ import { useDropdown } from '@/hooks/useDropdown';
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 export default function UserProfile() {
-  const { user, updateUser, logout } = useAuthStore();
+  const { user, updateProfileAction, logout, isLoading, error, clearError } = useAuthStore();
   const { isOpen, toggle, close, ref } = useDropdown();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [editForm, setEditForm] = useState({
-    nickname: user?.nickname || '',
+    nickname: user?.nickname || user?.userName || '',
     bio: user?.bio || '',
     phone: user?.phone || '',
   });
@@ -32,7 +36,7 @@ export default function UserProfile() {
   useEffect(() => {
     if (user) {
       setEditForm({
-        nickname: user.nickname || '',
+        nickname: user.nickname || user.userName || '',
         bio: user.bio || '',
         phone: user.phone || '',
       });
@@ -41,15 +45,33 @@ export default function UserProfile() {
 
   if (!user) return null;
 
-  const displayName = user.nickname || user.username || '用户';
+  const displayName = user.nickname || user.userName || '用户';
 
-  const handleSave = () => {
-    updateUser({
-      nickname: editForm.nickname.trim() || undefined,
-      bio: editForm.bio.trim() || undefined,
-      phone: editForm.phone.trim() || undefined,
-    });
-    setShowEditModal(false);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateProfileAction({
+        nickname: editForm.nickname.trim() || undefined,
+        bio: editForm.bio.trim() || undefined,
+        phone: editForm.phone.trim() || undefined,
+      });
+      setShowEditModal(false);
+    } catch {
+      // 错误已在 store 中
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const { deleteAccountAction } = useAuthStore.getState();
+    try {
+      await deleteAccountAction();
+      setShowDeleteConfirm(false);
+      window.location.href = '/';
+    } catch {
+      // 错误已在 store 中
+    }
   };
 
   return (
@@ -301,16 +323,108 @@ export default function UserProfile() {
                 </motion.button>
                 <motion.button
                   onClick={handleSave}
+                  disabled={saving}
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.94 }}
                   transition={springFast}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                   style={{ backgroundColor: 'var(--primary)' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.9'; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
                 >
-                  <Check className="w-4 h-4" />
+                  {saving ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
                   保存
+                </motion.button>
+              </div>
+
+              {error && (
+                <p className="text-xs text-center" style={{ color: 'var(--danger)' }}>{error}</p>
+              )}
+
+              {/* 删除账号 */}
+              <div className="pt-2" style={{ borderTop: '1px solid var(--border-color)' }}>
+                <motion.button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setShowDeleteConfirm(true);
+                  }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springFast}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--danger)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  注销账号
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 删除确认弹窗 */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl p-6 space-y-5"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                border: '1px solid var(--glass-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(255,77,79,0.1)' }}>
+                  <AlertTriangle className="w-6 h-6" style={{ color: 'var(--danger)' }} />
+                </div>
+                <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  确认注销账号
+                </h3>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  注销后所有数据将被删除，此操作不可撤销。
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <motion.button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={springFast}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                  style={{
+                    backgroundColor: 'var(--button-bg)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  取消
+                </motion.button>
+                <motion.button
+                  onClick={handleDeleteAccount}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.94 }}
+                  transition={springFast}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
+                  style={{ backgroundColor: 'var(--danger)' }}
+                >
+                  确认注销
                 </motion.button>
               </div>
             </motion.div>

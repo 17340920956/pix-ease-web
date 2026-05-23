@@ -1,65 +1,181 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { login as loginApi, register as registerApi, getUserInfo } from '@/api/auth';
+import { updateUser as updateUserApi, deleteUser as deleteUserApi } from '@/api/user';
 
 /**
  * 用户信息接口
  */
 export interface User {
-  id: string;
+  id: number;
   email: string;
-  username: string;
+  userName: string;
+  account: string;
+  role: number;
   avatar?: string;
   nickname?: string;
   bio?: string;
   phone?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createTime?: string;
+  updateTime?: string;
 }
 
 /**
  * 认证状态存储接口
  */
 interface AuthState {
-  /** 当前登录用户 */
   user: User | null;
-  /** 登录状态 */
   isAuthenticated: boolean;
-  /** 加载状态 */
   isLoading: boolean;
-  /** 设置用户信息 */
+  error: string | null;
   setUser: (user: User | null) => void;
-  /** 更新用户信息字段 */
   updateUser: (updates: Partial<User>) => void;
-  /** 设置登录状态 */
   setIsAuthenticated: (status: boolean) => void;
-  /** 设置加载状态 */
   setIsLoading: (loading: boolean) => void;
-  /** 登出 */
   logout: () => void;
+  loginAction: (account: string, password: string) => Promise<void>;
+  registerAction: (userName: string, email: string, password: string, code: string) => Promise<void>;
+  updateProfileAction: (updates: Partial<User>) => Promise<void>;
+  deleteAccountAction: () => Promise<void>;
+  fetchUserInfoAction: () => Promise<void>;
+  clearError: () => void;
 }
 
-/**
- * 用户认证状态管理 Store
- * 使用 Zustand 实现，支持持久化存储
- */
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      error: null,
+
       setUser: (user) => set({ user }),
       updateUser: (updates) =>
-        set((state) => ({
-          user: state.user ? { ...state.user, ...updates, updatedAt: new Date().toISOString() } : null,
-        })),
+    set((state) => ({
+      user: state.user ? { ...state.user, ...updates, updateTime: new Date().toISOString() } : null,
+    })),
       setIsAuthenticated: (status) => set({ isAuthenticated: status }),
       setIsLoading: (loading) => set({ isLoading: loading }),
-      logout: () => set({ user: null, isAuthenticated: false }),
+      logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+        }
+        set({ user: null, isAuthenticated: false, error: null });
+      },
+      clearError: () => set({ error: null }),
+
+      loginAction: async (account: string, password: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const res = await loginApi({ account, password });
+          if (res.code === 200) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('token', res.data.token);
+            }
+            const userData = res.data.user;
+            set({
+              user: userData ? {
+                id: userData.id,
+                email: userData.email || '',
+                userName: userData.userName || '',
+                account: userData.account || '',
+                role: userData.role,
+                createTime: userData.createTime,
+                updateTime: userData.updateTime,
+              } : null,
+              isAuthenticated: true,
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            set({ isLoading: false, error: res.message || '登录失败' });
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : '登录失败，请检查网络连接';
+          set({ isLoading: false, error: message });
+          throw err;
+        }
+      },
+
+      registerAction: async (userName: string, email: string, password: string, code: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const res = await registerApi({ userName, email, password, code });
+          if (res.code === 200) {
+            set({ isLoading: false, error: null });
+          } else {
+            set({ isLoading: false, error: res.message || '注册失败' });
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : '注册失败，请检查网络连接';
+          set({ isLoading: false, error: message });
+          throw err;
+        }
+      },
+
+      updateProfileAction: async (updates: Partial<User>) => {
+        set({ isLoading: true, error: null });
+        try {
+          const res = await updateUserApi(updates);
+          if (res.code === 200) {
+            set((state) => ({
+              user: state.user ? { ...state.user, ...res.data, updateTime: new Date().toISOString() } : null,
+              isLoading: false,
+              error: null,
+            }));
+          } else {
+            set({ isLoading: false, error: res.message || '更新失败' });
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : '更新失败，请检查网络连接';
+          set({ isLoading: false, error: message });
+          throw err;
+        }
+      },
+
+      deleteAccountAction: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const res = await deleteUserApi();
+          if (res.code === 200) {
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token');
+            }
+            set({ user: null, isAuthenticated: false, isLoading: false, error: null });
+          } else {
+            set({ isLoading: false, error: res.message || '注销失败' });
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : '注销失败，请检查网络连接';
+          set({ isLoading: false, error: message });
+          throw err;
+        }
+      },
+
+      fetchUserInfoAction: async () => {
+        set({ isLoading: true });
+        try {
+          const res = await getUserInfo();
+          if (res.code === 200) {
+            set({ user: res.data, isAuthenticated: true, isLoading: false });
+          } else {
+            set({ isLoading: false });
+          }
+        } catch {
+          set({ isLoading: false });
+        }
+      },
     }),
     {
       name: 'auth-storage',
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (state && state.isAuthenticated && !state.user) {
+            useAuthStore.setState({ isAuthenticated: false, user: null });
+          }
+        };
+      },
     }
   )
 );

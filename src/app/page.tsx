@@ -13,10 +13,9 @@ import {
   Zap,
   Lock,
   Heart,
-  Layers,
   MousePointerClick,
-  LogOut,
   LogIn,
+  LogOut,
   Palette,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -41,7 +40,7 @@ const features = [
   {
     icon: <FileType className="w-5 h-5" />,
     title: '格式转换',
-    description: 'JPG、PNG、WEBP、AVIF，支持 50+ 格式互转',
+    description: 'JPG、PNG、WEBP、AVIF 等主流格式互转',
     href: '/image-tool?type=convert',
     gradient: 'from-blue-500 to-cyan-400',
     bg: 'bg-blue-50 dark:bg-blue-500/10',
@@ -73,7 +72,7 @@ const features = [
   {
     icon: <Palette className="w-5 h-5" />,
     title: '像素工坊',
-    description: '专业像素画编辑器，支持图层与动画',
+    description: '像素画编辑器，支持图层与动画',
     href: '/pixel-studio',
     gradient: 'from-pink-500 to-rose-400',
     bg: 'bg-pink-50 dark:bg-pink-500/10',
@@ -83,7 +82,6 @@ const features = [
 const stats = [
   { value: '100%', label: '本地处理', icon: <Shield className="w-4 h-4" /> },
   { value: '0', label: '数据上传', icon: <Lock className="w-4 h-4" /> },
-  { value: '50+', label: '支持格式', icon: <Layers className="w-4 h-4" /> },
   { value: '免费', label: '完全免费', icon: <Heart className="w-4 h-4" /> },
 ];
 
@@ -96,14 +94,14 @@ const highlights = [
   },
   {
     icon: <Zap className="w-6 h-6" />,
-    title: '极速处理',
-    description: '采用 WebAssembly 技术，处理速度媲美原生应用，无需长时间等待',
+    title: '快速处理',
+    description: '基于浏览器原生能力，快速完成图片处理',
     gradient: 'from-amber-400 to-orange-400',
   },
   {
     icon: <MousePointerClick className="w-6 h-6" />,
     title: '简单易用',
-    description: '直观的操作界面，无需专业知识即可上手，拖拽即用',
+    description: '直观的操作界面，拖拽即用，轻松上手',
     gradient: 'from-blue-400 to-indigo-400',
   },
 ];
@@ -274,7 +272,7 @@ export default function Home() {
             className="text-center mb-14"
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              强大功能，一站搞定
+              常用功能，一站搞定
             </h2>
             <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
               无论是 GIF 编辑还是图片处理，PixEase 都能满足您的需求

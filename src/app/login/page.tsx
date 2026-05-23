@@ -13,9 +13,11 @@ import {
   Zap,
   Check,
   Shield,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
+import { sendCode as sendCodeApi } from '@/api/auth';
 import { useRouter } from 'next/navigation';
 import SkyBackground from '@/app/components/SkyBackground';
 
@@ -27,10 +29,17 @@ const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass:
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser, setIsAuthenticated } = useAuthStore();
+  const {
+    setUser,
+    setIsAuthenticated,
+    loginAction,
+    registerAction,
+    isLoading,
+    error,
+    clearError,
+  } = useAuthStore();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [agreed, setAgreed] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -47,46 +56,62 @@ export default function LoginPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    clearError();
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const sendVerificationCode = () => {
+  const sendVerificationCode = async () => {
     if (countdown > 0 || !formData.email) return;
-    setCountdown(60);
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) { clearInterval(timer); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
+    try {
+      await sendCodeApi(formData.email);
+      setCountdown(60);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) { clearInterval(timer); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch {
+      // mock 模式下 sendCode 不会抛错
+    }
   };
 
   const handleTestLogin = async () => {
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setUser({
-      id: 'test-001', email: 'test@pixease.com', username: '测试用户',
-      nickname: 'PixEase测试员', bio: '热爱图片处理与创意设计的测试用户',
-      phone: '13800138000', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    });
-    setIsAuthenticated(true);
-    setIsLoading(false);
+    await loginAction('test@pixease.com', '123456');
     router.push('/gif-editor');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreed) { alert('请先同意服务条款和隐私政策'); return; }
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setUser({
-      id: '1', email: formData.email || 'user@example.com',
-      username: formData.username || '用户', nickname: formData.username || undefined,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    });
-    setIsAuthenticated(true);
-    setIsLoading(false);
-    router.push('/gif-editor');
+
+    if (authMode === 'login') {
+      try {
+        await loginAction(formData.email, formData.password);
+        setFormData({ email: '', password: '', confirmPassword: '', username: '', verificationCode: '' });
+        setAgreed(false);
+        router.push('/gif-editor');
+      } catch {
+        // 错误已在 store 中设置
+      }
+    } else if (authMode === 'register') {
+      if (formData.password !== formData.confirmPassword) {
+        alert('两次密码输入不一致');
+        return;
+      }
+      try {
+        await registerAction(formData.username, formData.email, formData.password, formData.verificationCode);
+        setAuthMode('login');
+        setFormData({ email: formData.email, password: '', confirmPassword: '', username: '', verificationCode: '' });
+        setAgreed(false);
+      } catch {
+        // 错误已在 store 中设置
+      }
+    } else if (authMode === 'forgot') {
+      // 找回密码：先发验证码再重置
+      // 此处简化为发送重置链接的提示
+      alert('密码重置链接已发送至 ' + formData.email + '（mock 模式下未实现）');
+    }
   };
 
   const switchMode = (mode: AuthMode) => {
@@ -155,15 +180,15 @@ export default function LoginPage() {
               className="text-base leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
-              专业的图片处理工具，支持 GIF 编辑、格式转换、图片压缩与像素工坊。所有处理均在浏览器本地完成。
+              图片处理工具，支持 GIF 编辑、格式转换、图片压缩与像素工坊。所有处理均在浏览器本地完成。
             </motion.p>
           </motion.div>
 
           <div className="mt-12 space-y-4 max-w-xs">
             {[
-              { icon: <Zap className="w-4 h-4" />, text: 'WebAssembly 极速处理引擎' },
+              { icon: <Zap className="w-4 h-4" />, text: '浏览器本地处理引擎' },
               { icon: <Shield className="w-4 h-4" />, text: '100% 本地处理，保护隐私' },
-              { icon: <Sparkles className="w-4 h-4" />, text: '支持 50+ 图片格式处理' },
+              { icon: <Sparkles className="w-4 h-4" />, text: '主流图片格式处理' },
             ].map((item, i) => (
               <motion.div
                 key={i}
@@ -254,6 +279,21 @@ export default function LoginPage() {
                 {authMode === 'forgot' && '输入邮箱地址以重置密码'}
               </p>
             </motion.div>
+
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm mb-4"
+                  style={{ backgroundColor: 'rgba(255,77,79,0.1)', color: 'var(--danger)', border: '1px solid rgba(255,77,79,0.2)' }}
+                >
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <AnimatePresence mode="wait">

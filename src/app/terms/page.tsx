@@ -39,7 +39,7 @@ export default function TermsPage() {
           <section>
             <h3 className="text-xl font-semibold text-slate-800 mb-4">服务说明</h3>
             <p className="text-slate-600 leading-relaxed mb-4">
-              PixEase 是一款专业的图片处理工具，提供以下核心功能：
+              PixEase 是一款图片处理工具，提供以下核心功能：
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
