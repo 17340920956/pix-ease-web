@@ -39,6 +39,7 @@ interface AuthState {
   deleteAccountAction: () => Promise<void>;
   fetchUserInfoAction: () => Promise<void>;
   clearError: () => void;
+  setError: (error: string | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -59,10 +60,12 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
+          document.cookie = 'auth=; path=/; max-age=0';
         }
         set({ user: null, isAuthenticated: false, error: null });
       },
       clearError: () => set({ error: null }),
+      setError: (error: string | null) => set({ error }),
 
       loginAction: async (account: string, password: string) => {
         set({ isLoading: true, error: null });
@@ -71,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
           if (res.code === 200) {
             if (typeof window !== 'undefined') {
               localStorage.setItem('token', res.data.token);
+              document.cookie = 'auth=1; path=/; max-age=86400; SameSite=Lax';
             }
             const userData = res.data.user;
             set({

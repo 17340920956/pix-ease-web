@@ -1,5 +1,6 @@
 import axios from 'axios'
 import md5 from 'js-md5'
+import { sha256 } from 'js-sha256'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api'
 const SECRET = 'pixease-sign-secret-2026'
@@ -34,6 +35,15 @@ function generateSign(params: Record<string, unknown>): Record<string, string> {
 request.interceptors.request.use((config) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
   const params: Record<string, unknown> = {}
+
+  if (config.data && typeof config.data === 'object') {
+    if (config.data.password && typeof config.data.password === 'string') {
+      config.data = { ...config.data, password: sha256(config.data.password) }
+    }
+    if (config.data.newPassword && typeof config.data.newPassword === 'string') {
+      config.data = { ...config.data, newPassword: sha256(config.data.newPassword) }
+    }
+  }
 
   if (config.method?.toLowerCase() === 'get') {
     Object.assign(params, config.params)

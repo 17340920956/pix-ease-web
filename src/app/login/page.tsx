@@ -42,6 +42,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [agreed, setAgreed] = useState(false);
+  const [termsError, setTermsError] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const currentYear = new Date().getFullYear();
@@ -76,21 +77,20 @@ export default function LoginPage() {
     }
   };
 
-  const handleTestLogin = async () => {
-    await loginAction('test@pixease.com', '123456');
-    router.push('/gif-editor');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agreed) { alert('请先同意服务条款和隐私政策'); return; }
+    if (!agreed) {
+      setTermsError(true);
+      return;
+    }
+    setTermsError(false);
 
     if (authMode === 'login') {
       try {
         await loginAction(formData.email, formData.password);
         setFormData({ email: '', password: '', confirmPassword: '', username: '', verificationCode: '' });
         setAgreed(false);
-        router.push('/gif-editor');
+        router.push('/image-tool');
       } catch {
         // 错误已在 store 中设置
       }
@@ -320,7 +320,7 @@ export default function LoginPage() {
                     </div>
                     <div className="flex items-start gap-2.5">
                       <motion.button
-                        type="button" onClick={() => setAgreed(!agreed)}
+                        type="button" onClick={() => { setAgreed(!agreed); setTermsError(false); }}
                         whileTap={{ scale: 0.9 }}
                         className={`mt-0.5 w-4.5 h-4.5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                           agreed ? 'border-[var(--primary)]' : 'border-[var(--text-muted)]'
@@ -342,6 +342,20 @@ export default function LoginPage() {
                         <button type="button" onClick={() => setShowPrivacy(true)} className="mx-0.5 font-medium" style={{ color: 'var(--primary)' }}>隐私政策</button>
                       </span>
                     </div>
+                    <AnimatePresence>
+                      {termsError && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                          style={{ backgroundColor: 'rgba(255,77,79,0.08)', color: 'var(--danger)' }}
+                        >
+                          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                          请先阅读并同意服务条款和隐私政策
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 )}
 
@@ -387,7 +401,7 @@ export default function LoginPage() {
                     </div>
                     <div className="flex items-start gap-2.5">
                       <motion.button
-                        type="button" onClick={() => setAgreed(!agreed)}
+                        type="button" onClick={() => { setAgreed(!agreed); setTermsError(false); }}
                         whileTap={{ scale: 0.9 }}
                         className={`mt-0.5 w-4.5 h-4.5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                           agreed ? 'border-[var(--primary)]' : 'border-[var(--text-muted)]'
@@ -409,6 +423,20 @@ export default function LoginPage() {
                         <button type="button" onClick={() => setShowPrivacy(true)} className="mx-0.5 font-medium" style={{ color: 'var(--primary)' }}>隐私政策</button>
                       </span>
                     </div>
+                    <AnimatePresence>
+                      {termsError && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                          style={{ backgroundColor: 'rgba(255,77,79,0.08)', color: 'var(--danger)' }}
+                        >
+                          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                          请先阅读并同意服务条款和隐私政策
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 )}
 
@@ -453,27 +481,6 @@ export default function LoginPage() {
                   </>
                 )}
               </motion.button>
-
-              {/* Test Login */}
-              {authMode === 'login' && (
-                <>
-                  <div className="flex items-center gap-3 my-4">
-                    <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-color)' }} />
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>或</span>
-                    <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-color)' }} />
-                  </div>
-
-                  <motion.button
-                    type="button" onClick={handleTestLogin} disabled={isLoading}
-                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    className="w-full py-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-                    style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-primary)', border: '1px solid var(--input-border)' }}
-                  >
-                    <Zap className="w-4 h-4" style={{ color: 'var(--primary)' }} />
-                    测试账号快速体验
-                  </motion.button>
-                </>
-              )}
 
               {/* Mode Switch */}
               <div className="mt-6 text-center">

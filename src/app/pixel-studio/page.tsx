@@ -36,6 +36,9 @@ function PixelStudioContent() {
   const [previewDataUrl, setPreviewDataUrl] = useState('');
   const [previewW, setPreviewW] = useState(0);
   const [previewH, setPreviewH] = useState(0);
+  const [exportPixelSize, setExportPixelSize] = useState(8);
+  const [showBorder, setShowBorder] = useState(false);
+  const [borderSize, setBorderSize] = useState(1);
 
   useEffect(() => {
     const hasContent = store.layers.some((l) => {
@@ -153,21 +156,59 @@ function PixelStudioContent() {
     setShowCreateDialog(false);
   }, [dialogW, dialogH, store]);
 
-  const handleExportPng = useCallback(() => {
+  const generateExportDataUrl = useCallback((pixelSize: number, withBorder: boolean, bSize: number) => {
+    const allPixels = new Map<string, string>();
+    for (const layer of store.layers) {
+      if (!layer.visible) continue;
+      const layerPixels = layer.pixels instanceof Map ? layer.pixels : new Map<string, string>(Object.entries(layer.pixels || {} as Record<string, string>));
+      layerPixels.forEach((color, key) => {
+        if (!allPixels.has(key)) allPixels.set(key, color);
+      });
+    }
+
+    if (allPixels.size === 0) return { dataUrl: '', w: 0, h: 0 };
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    allPixels.forEach((_, key) => {
+      const [x, y] = key.split(',').map(Number);
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    });
+
+    const contentW = maxX - minX + 1;
+    const contentH = maxY - minY + 1;
+    const borderPx = withBorder ? bSize : 0;
     const canvas = document.createElement('canvas');
-    const scale = store.viewport.scale;
-    canvas.width = store.project.width * scale;
-    canvas.height = store.project.height * scale;
+    canvas.width = (contentW + borderPx * 2) * pixelSize;
+    canvas.height = (contentH + borderPx * 2) * pixelSize;
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
 
-    pixelsToCanvas(ctx, store, scale);
+    if (withBorder && bSize > 0) {
+      ctx.fillStyle = store.project.backgroundColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
-    setPreviewW(canvas.width);
-    setPreviewH(canvas.height);
-    setPreviewDataUrl(canvas.toDataURL('image/png'));
-    setShowPreview(true);
+    allPixels.forEach((color, key) => {
+      const [x, y] = key.split(',').map(Number);
+      const dx = (x - minX + borderPx) * pixelSize;
+      const dy = (y - minY + borderPx) * pixelSize;
+      ctx.fillStyle = color;
+      ctx.fillRect(dx, dy, pixelSize, pixelSize);
+    });
+
+    return { dataUrl: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height };
   }, [store]);
+
+  const handleExportPng = useCallback(() => {
+    const result = generateExportDataUrl(exportPixelSize, showBorder, borderSize);
+    setPreviewDataUrl(result.dataUrl);
+    setPreviewW(result.w);
+    setPreviewH(result.h);
+    setShowPreview(true);
+  }, [exportPixelSize, showBorder, borderSize, generateExportDataUrl]);
 
   const handleDownloadPng = useCallback(() => {
     const a = document.createElement('a');
@@ -533,13 +574,14 @@ function PixelStudioContent() {
         </div>
       )}
       {showPreview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={() => setShowPreview(false)}>
           <div
-            className="rounded-2xl shadow-2xl max-w-[90vw] max-h-[90vh] overflow-auto"
+            className="rounded-2xl shadow-2xl max-w-[92vw] max-h-[92vh] overflow-auto"
             style={{
               backgroundColor: 'var(--card-bg)',
               border: '1px solid var(--border-color)',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
               <div>
@@ -565,42 +607,108 @@ function PixelStudioContent() {
               </button>
             </div>
 
-            <div className="p-5 flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
-              <img
-                src={previewDataUrl}
-                alt="预览"
-                style={{ imageRendering: 'pixelated', maxWidth: '80vw', maxHeight: '60vh' }}
-              />
-            </div>
+            <div className="flex flex-col md:flex-row">
+              <div className="p-4 flex items-center justify-center min-w-[200px]" style={{ backgroundColor: 'var(--background)' }}>
+                <img
+                  src={previewDataUrl}
+                  alt="预览"
+                  style={{ imageRendering: 'pixelated', maxWidth: '70vw', maxHeight: '50vh' }}
+                />
+              </div>
 
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
-              <button
-                onClick={() => setShowPreview(false)}
-                className="px-4 py-2 text-xs font-medium rounded-lg transition-colors"
-                style={{
-                  backgroundColor: 'var(--button-bg)',
-                  color: 'var(--text-secondary)',
-                  border: '1px solid var(--input-border)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--button-hover-bg)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--button-bg)';
-                }}
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  handleDownloadPng();
-                  setShowPreview(false);
-                }}
-                className="px-5 py-2 text-xs font-semibold rounded-lg transition-colors"
-                style={{ backgroundColor: 'var(--primary)', color: '#ffffff' }}
-              >
-                下载 PNG
-              </button>
+              <div className="p-4 border-t md:border-t-0 md:border-l flex flex-col gap-3 min-w-[200px]" style={{ borderColor: 'var(--border-color)' }}>
+                <div>
+                  <label className="text-[11px] font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    像素块大小: {exportPixelSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={32}
+                    value={exportPixelSize}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setExportPixelSize(val);
+                      const result = generateExportDataUrl(val, showBorder, borderSize);
+                      setPreviewDataUrl(result.dataUrl);
+                      setPreviewW(result.w);
+                      setPreviewH(result.h);
+                    }}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showBorder}
+                      onChange={(e) => {
+                        setShowBorder(e.target.checked);
+                        const result = generateExportDataUrl(exportPixelSize, e.target.checked, borderSize);
+                        setPreviewDataUrl(result.dataUrl);
+                        setPreviewW(result.w);
+                        setPreviewH(result.h);
+                      }}
+                      className="w-3.5 h-3.5"
+                    />
+                    <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>添加边框</span>
+                  </label>
+                </div>
+
+                {showBorder && (
+                  <div>
+                    <label className="text-[11px] font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                      边框粗细: {borderSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={20}
+                      value={borderSize}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setBorderSize(val);
+                        const result = generateExportDataUrl(exportPixelSize, true, val);
+                        setPreviewDataUrl(result.dataUrl);
+                        setPreviewW(result.w);
+                        setPreviewH(result.h);
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+
+                <div className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                  边框颜色 = 画布背景 ({store.project.backgroundColor})
+                </div>
+
+                <div className="flex items-center gap-2 mt-auto pt-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                  <button
+                    onClick={() => setShowPreview(false)}
+                    className="flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: 'var(--button-bg)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--input-border)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--button-hover-bg)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--button-bg)'; }}
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleDownloadPng();
+                      setShowPreview(false);
+                    }}
+                    className="flex-1 px-4 py-2 text-xs font-semibold rounded-lg transition-colors"
+                    style={{ backgroundColor: 'var(--primary)', color: '#ffffff' }}
+                  >
+                    下载 PNG
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -609,23 +717,3 @@ function PixelStudioContent() {
   );
 }
 
-function pixelsToCanvas(
-  ctx: CanvasRenderingContext2D,
-  store: ReturnType<typeof usePixelStore.getState>,
-  scale: number
-) {
-  ctx.fillStyle = store.project.backgroundColor;
-  ctx.fillRect(0, 0, store.project.width * scale, store.project.height * scale);
-
-  for (const layer of store.layers) {
-    if (!layer.visible) continue;
-    ctx.globalAlpha = layer.opacity;
-    const pixels = layer.pixels instanceof Map ? layer.pixels : new Map<string, string>(Object.entries(layer.pixels || {} as Record<string, string>));
-    pixels.forEach((color, key) => {
-      const [x, y] = key.split(',').map(Number);
-      ctx.fillStyle = color;
-      ctx.fillRect(x * scale, y * scale, scale, scale);
-    });
-  }
-  ctx.globalAlpha = 1;
-}
