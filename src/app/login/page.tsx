@@ -42,6 +42,7 @@ export default function LoginPage() {
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [sendingCode, setSendingCode] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [termsError, setTermsError] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -63,7 +64,8 @@ export default function LoginPage() {
   };
 
   const sendVerificationCode = async () => {
-    if (countdown > 0 || !formData.email) return;
+    if (countdown > 0 || sendingCode || !formData.email) return;
+    setSendingCode(true);
     try {
       await sendCodeApi(formData.email);
       setCountdown(60);
@@ -75,6 +77,8 @@ export default function LoginPage() {
       }, 1000);
     } catch {
       // mock 模式下 sendCode 不会抛错
+    } finally {
+      setSendingCode(false);
     }
   };
 
@@ -409,12 +413,22 @@ export default function LoginPage() {
                     <div className="flex gap-2">
                       <input type="text" name="verificationCode" placeholder="验证码" value={formData.verificationCode} onChange={handleInputChange} style={{ ...inputStyle, flex: 1, paddingLeft: 16 }} />
                       <motion.button
-                        type="button" onClick={sendVerificationCode} disabled={countdown > 0}
+                        type="button" onClick={sendVerificationCode} disabled={countdown > 0 || sendingCode}
                         whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                         className="px-4 py-3 rounded-xl text-sm font-medium text-white whitespace-nowrap disabled:opacity-50"
                         style={{ backgroundColor: 'var(--primary)' }}
                       >
-                        {countdown > 0 ? `${countdown}s` : '获取验证码'}
+                        {sendingCode ? (
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                            className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full mx-auto"
+                          />
+                        ) : countdown > 0 ? (
+                          `${countdown}s`
+                        ) : (
+                          '获取验证码'
+                        )}
                       </motion.button>
                     </div>
                     <div className="relative">

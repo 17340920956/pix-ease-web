@@ -48,6 +48,25 @@ export default function UserProfile() {
   const displayName = user.nickname || user.userName || '用户';
 
   const handleSave = async () => {
+    const { setError } = useAuthStore.getState();
+
+    if (!editForm.nickname.trim()) {
+      setError('昵称不能为空');
+      return;
+    }
+    if (editForm.nickname.trim().length < 2 || editForm.nickname.trim().length > 32) {
+      setError('昵称长度需要在2-32个字符之间');
+      return;
+    }
+    if (editForm.bio && editForm.bio.length > 200) {
+      setError('个人简介不能超过200个字符');
+      return;
+    }
+    if (editForm.phone && !/^1[3-9]\d{9}$/.test(editForm.phone.trim())) {
+      setError('请输入正确的手机号码');
+      return;
+    }
+
     setSaving(true);
     try {
       await updateProfileAction({
