@@ -37,6 +37,7 @@ export default function LoginPage() {
     isLoading,
     error,
     clearError,
+    setError,
   } = useAuthStore();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -84,6 +85,36 @@ export default function LoginPage() {
       return;
     }
     setTermsError(false);
+    clearError();
+
+    const validate = (): string | null => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (authMode === 'login') {
+        if (!formData.email.trim()) return '请输入邮箱或账号';
+        if (!formData.password) return '请输入密码';
+        if (formData.password.length < 6) return '密码长度不能少于6位';
+      } else if (authMode === 'register') {
+        if (!formData.username.trim()) return '请输入用户名';
+        if (formData.username.trim().length < 2) return '用户名至少需要2个字符';
+        if (!formData.email.trim()) return '请输入邮箱地址';
+        if (!emailRegex.test(formData.email.trim())) return '请输入有效的邮箱地址';
+        if (!formData.verificationCode.trim()) return '请输入验证码';
+        if (!formData.password) return '请输入密码';
+        if (formData.password.length < 6) return '密码长度不能少于6位';
+        if (formData.password !== formData.confirmPassword) return '两次密码输入不一致';
+      } else if (authMode === 'forgot') {
+        if (!formData.email.trim()) return '请输入邮箱地址';
+        if (!emailRegex.test(formData.email.trim())) return '请输入有效的邮箱地址';
+      }
+      return null;
+    };
+
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     if (authMode === 'login') {
       try {
@@ -96,10 +127,6 @@ export default function LoginPage() {
         // 错误已在 store 中设置
       }
     } else if (authMode === 'register') {
-      if (formData.password !== formData.confirmPassword) {
-        alert('两次密码输入不一致');
-        return;
-      }
       try {
         await registerAction(formData.username, formData.email, formData.password, formData.verificationCode);
         setAuthMode('login');
