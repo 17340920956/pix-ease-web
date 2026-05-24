@@ -462,7 +462,7 @@ export default function LoginPage() {
               {/* Submit Button */}
               <motion.button
                 type="submit"
-                disabled={isLoading || !agreed}
+                disabled={isLoading}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 className="w-full py-3.5 rounded-xl font-medium text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
