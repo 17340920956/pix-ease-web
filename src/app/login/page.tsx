@@ -92,6 +92,7 @@ export default function LoginPage() {
         setAgreed(false);
         router.push('/image-tool');
       } catch {
+        setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         // 错误已在 store 中设置
       }
     } else if (authMode === 'register') {
@@ -105,6 +106,7 @@ export default function LoginPage() {
         setFormData({ email: formData.email, password: '', confirmPassword: '', username: '', verificationCode: '' });
         setAgreed(false);
       } catch {
+        setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         // 错误已在 store 中设置
       }
     } else if (authMode === 'forgot') {

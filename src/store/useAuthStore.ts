@@ -95,7 +95,12 @@ export const useAuthStore = create<AuthState>()(
             set({ isLoading: false, error: res.message || '登录失败' });
           }
         } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : '登录失败，请检查网络连接';
+          let message = '登录失败，请检查网络连接';
+          if (err && typeof err === 'object' && 'message' in err && typeof (err as Record<string, unknown>).message === 'string') {
+            message = (err as Record<string, string>).message;
+          } else if (err instanceof Error) {
+            message = err.message;
+          }
           set({ isLoading: false, error: message });
           throw err;
         }
@@ -111,7 +116,12 @@ export const useAuthStore = create<AuthState>()(
             set({ isLoading: false, error: res.message || '注册失败' });
           }
         } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : '注册失败，请检查网络连接';
+          let message = '注册失败，请检查网络连接';
+          if (err && typeof err === 'object' && 'message' in err && typeof (err as Record<string, unknown>).message === 'string') {
+            message = (err as Record<string, string>).message;
+          } else if (err instanceof Error) {
+            message = err.message;
+          }
           set({ isLoading: false, error: message });
           throw err;
         }
