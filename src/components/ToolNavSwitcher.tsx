@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image as ImageIcon, Film, Grid3x3, ChevronDown } from 'lucide-react';
+import { Image as ImageIcon, Film, Grid3x3, ChevronDown, Bean } from 'lucide-react';
 import { useDropdown } from '@/hooks/useDropdown';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
@@ -32,6 +32,12 @@ const tools: ToolItem[] = [
     href: '/pixel-studio',
     label: '像素工坊',
     icon: <Grid3x3 className="w-4 h-4" />,
+    active: false,
+  },
+  {
+    href: '/perler-bead',
+    label: '拼豆吧',
+    icon: <Bean className="w-4 h-4" />,
     active: false,
   },
 ];

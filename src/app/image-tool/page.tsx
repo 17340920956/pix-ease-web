@@ -44,7 +44,7 @@ const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass:
  */
 export default function ImageToolPage() {
   return (
-    <AuthGuard>
+    <AuthGuard allowGuest>
       <ImageToolContent />
     </AuthGuard>
   );

@@ -291,9 +291,14 @@ export async function generateGifBlob(
   frames: GifFrame[],
   onProgress?: (progress: number) => void
 ): Promise<Blob> {
+  const visibleFrames = frames.filter((f) => !f.hidden);
+  if (visibleFrames.length === 0) {
+    throw new Error('没有可见的帧可供导出');
+  }
+
   const GIF = (await import('gif.js')).default;
 
-  const firstCanvas = frames.find((f) => f.canvas)?.canvas;
+  const firstCanvas = visibleFrames.find((f) => f.canvas)?.canvas;
   const outW = firstCanvas?.width || 0;
   const outH = firstCanvas?.height || 0;
   if (!outW || !outH) {
@@ -301,7 +306,7 @@ export async function generateGifBlob(
   }
 
   const normalized: (HTMLCanvasElement | null)[] = [];
-  for (const frame of frames) {
+  for (const frame of visibleFrames) {
     if (!frame.canvas) {
       normalized.push(null);
       continue;
@@ -370,7 +375,7 @@ export async function generateGifBlob(
 
     normalized.forEach((canvas, i) => {
       if (canvas) {
-        gif.addFrame(canvas, { delay: frames[i].delay });
+        gif.addFrame(canvas, { delay: visibleFrames[i].delay });
       }
     });
 

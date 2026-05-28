@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@imgly/background-removal": "^1.7.0",
     "@types/gl-matrix": "^2.4.5",
     "axios": "^1.16.1",
     "browser-image-compression": "^2.0.2",

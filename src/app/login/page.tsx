@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail,
@@ -14,6 +14,9 @@ import {
   Check,
   Shield,
   AlertCircle,
+  ChevronLeft,
+  Wand2,
+  UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -27,6 +30,40 @@ const springApple = { type: 'spring' as const, stiffness: 350, damping: 28, mass
 const springGentle = { type: 'spring' as const, stiffness: 180, damping: 22, mass: 0.9 };
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
+const EMPTY_FORM = {
+  email: '',
+  password: '',
+  confirmPassword: '',
+  username: '',
+  verificationCode: '',
+};
+
+const brandFeatures = [
+  {
+    icon: <Shield className="w-5 h-5" />,
+    title: '隐私优先',
+    description: '所有处理在浏览器本地完成',
+  },
+  {
+    icon: <Zap className="w-5 h-5" />,
+    title: '极速引擎',
+    description: '基于 WebAssembly 毫秒级响应',
+  },
+  {
+    icon: <Wand2 className="w-5 h-5" />,
+    title: '丰富工具',
+    description: 'GIF编辑 · 格式转换 · 像素创作',
+  },
+];
+
+const floatingShapes = [
+  { shape: 'circle', size: 60, x: '10%', y: '25%', delay: 0, color: 'from-blue-400/20 to-cyan-400/20' },
+  { shape: 'square', size: 40, x: '85%', y: '15%', delay: 1.5, color: 'from-purple-400/20 to-pink-400/20' },
+  { shape: 'circle', size: 80, x: '70%', y: '80%', delay: 2.2, color: 'from-rose-400/20 to-orange-400/20' },
+  { shape: 'square', size: 30, x: '20%', y: '75%', delay: 0.8, color: 'from-emerald-400/20 to-teal-400/20' },
+  { shape: 'circle', size: 50, x: '50%', y: '45%', delay: 3, color: 'from-amber-400/20 to-yellow-400/20' },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const {
@@ -38,6 +75,8 @@ export default function LoginPage() {
     error,
     clearError,
     setError,
+    isAuthenticated,
+    setGuest,
   } = useAuthStore();
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -48,14 +87,40 @@ export default function LoginPage() {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const currentYear = new Date().getFullYear();
+  const prevAuthRef = useRef(isAuthenticated);
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    username: '',
-    verificationCode: '',
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    setFormData(EMPTY_FORM);
+    setAgreed(false);
+    setTermsError(false);
+    clearError();
+  }, [clearError]);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setFormData(EMPTY_FORM);
+        setAgreed(false);
+        setTermsError(false);
+        clearError();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [clearError]);
+
+  useEffect(() => {
+    const wasAuth = prevAuthRef.current;
+    prevAuthRef.current = isAuthenticated;
+    if (wasAuth && !isAuthenticated) {
+      setFormData(EMPTY_FORM);
+      setAgreed(false);
+      setTermsError(false);
+      clearError();
+    }
+  }, [isAuthenticated, clearError]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -76,7 +141,6 @@ export default function LoginPage() {
         });
       }, 1000);
     } catch {
-      // mock 模式下 sendCode 不会抛错
     } finally {
       setSendingCode(false);
     }
@@ -123,12 +187,11 @@ export default function LoginPage() {
     if (authMode === 'login') {
       try {
         await loginAction(formData.email, formData.password);
-        setFormData({ email: '', password: '', confirmPassword: '', username: '', verificationCode: '' });
+        setFormData(EMPTY_FORM);
         setAgreed(false);
         router.push('/image-tool');
       } catch {
         setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
-        // 错误已在 store 中设置
       }
     } else if (authMode === 'register') {
       try {
@@ -138,50 +201,74 @@ export default function LoginPage() {
         setAgreed(false);
       } catch {
         setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
-        // 错误已在 store 中设置
       }
     } else if (authMode === 'forgot') {
-      // 找回密码：先发验证码再重置
-      // 此处简化为发送重置链接的提示
       alert('密码重置链接已发送至 ' + formData.email + '（mock 模式下未实现）');
     }
   };
 
   const switchMode = (mode: AuthMode) => {
     setAuthMode(mode);
-    setFormData({ email: '', password: '', confirmPassword: '', username: '', verificationCode: '' });
+    setFormData(EMPTY_FORM);
     setAgreed(false);
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 16px 12px 44px',
-    borderRadius: 12,
-    fontSize: 15,
-    border: '1px solid var(--input-border)',
-    backgroundColor: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    outline: 'none',
-    transition: 'border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  const handleGuestLogin = () => {
+    setGuest(true);
+    router.push('/image-tool');
   };
+
+  const inputClass = `w-full pl-11 pr-4 py-3.5 rounded-xl text-[15px] outline-none transition-all duration-300 border bg-[var(--input-bg)] text-[var(--text-primary)] border-[var(--input-border)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10`;
 
   return (
     <div className="min-h-screen relative flex" style={{ backgroundColor: 'var(--background)' }}>
       <SkyBackground />
 
-      {/* 左侧 - 品牌与特性 */}
-      <div className="hidden lg:flex lg:w-[45%] xl:w-[42%] flex-col justify-between p-12 xl:p-16 relative">
-        <div>
+      {/* ===== Left - Brand Panel ===== */}
+      <div className="hidden lg:flex lg:w-[45%] xl:w-[44%] flex-col justify-between p-12 xl:p-16 relative overflow-hidden">
+        {/* Floating decorative shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {floatingShapes.map((item, i) => (
+            <motion.div
+              key={i}
+              className={`absolute bg-gradient-to-br ${item.color} backdrop-blur-3xl`}
+              style={{
+                left: item.x,
+                top: item.y,
+                width: item.size,
+                height: item.size,
+                borderRadius: item.shape === 'circle' ? '50%' : '25%',
+              }}
+              animate={{
+                y: [0, -15, 0, 10, 0],
+                rotate: [0, 5, -5, 3, 0],
+                scale: [1, 1.05, 1, 1.02, 1],
+              }}
+              transition={{
+                duration: 6 + i,
+                repeat: Infinity,
+                delay: item.delay,
+                ease: 'easeInOut',
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="relative z-10">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ ...springApple, delay: 0.05 }}
           >
-            <Link href="/" className="inline-flex items-center gap-2.5 mb-16 group">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 rounded-xl flex items-center justify-center shadow-sm transition-transform group-hover:scale-110 group-hover:rotate-3">
+            <Link href="/" className="inline-flex items-center gap-3 mb-16 group">
+              <motion.div
+                whileHover={{ scale: 1.12, rotate: 6 }}
+                transition={springApple}
+                className="w-10 h-10 bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20"
+              >
                 <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              </motion.div>
+              <span className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                 PixEase
               </span>
             </Link>
@@ -191,20 +278,42 @@ export default function LoginPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springGentle, delay: 0.12 }}
-            className="max-w-sm space-y-6"
+            className="max-w-md space-y-6"
           >
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...springApple, delay: 0.18 }}
-              className="text-3xl xl:text-4xl font-bold leading-[1.15] tracking-tight"
+              className="text-4xl xl:text-5xl font-extrabold leading-[1.12] tracking-tight"
               style={{ color: 'var(--text-primary)' }}
             >
-              让创作
-              <br />
-              <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient">
-                触手可及
-              </span>
+              {authMode === 'login' && (
+                <>
+                  欢迎
+                  <br />
+                  <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+                    回来
+                  </span>
+                </>
+              )}
+              {authMode === 'register' && (
+                <>
+                  加入
+                  <br />
+                  <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+                    PixEase
+                  </span>
+                </>
+              )}
+              {authMode === 'forgot' && (
+                <>
+                  重置
+                  <br />
+                  <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+                    密码
+                  </span>
+                </>
+              )}
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 16 }}
@@ -213,51 +322,65 @@ export default function LoginPage() {
               className="text-base leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
-              图片处理工具，支持 GIF 编辑、格式转换、图片压缩与像素工坊。所有处理均在浏览器本地完成。
+              {authMode === 'login' && '登录您的 PixEase 账号，继续您的创作之旅'}
+              {authMode === 'register' && '免费注册 PixEase 账号，解锁全部图片处理工具'}
+              {authMode === 'forgot' && '输入注册邮箱，我们将发送密码重置链接'}
             </motion.p>
           </motion.div>
 
-          <div className="mt-12 space-y-4 max-w-xs">
-            {[
-              { icon: <Zap className="w-4 h-4" />, text: '浏览器本地处理引擎' },
-              { icon: <Shield className="w-4 h-4" />, text: '100% 本地处理，保护隐私' },
-              { icon: <Sparkles className="w-4 h-4" />, text: '主流图片格式处理' },
-            ].map((item, i) => (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.45 }}
+            className="mt-14 space-y-4"
+          >
+            {brandFeatures.map((item, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, x: -16 }}
+                initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ ...springApple, delay: 0.35 + i * 0.12 }}
-                whileHover={{ x: 4, scale: 1.02 }}
-                className="flex items-center gap-3 text-sm cursor-default"
-                style={{ color: 'var(--text-secondary)' }}
+                transition={{ ...springApple, delay: 0.5 + i * 0.1 }}
+                whileHover={{ x: 6, scale: 1.02 }}
+                className="flex items-center gap-4 p-4 rounded-2xl cursor-default transition-colors"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--card-bg) 60%, transparent)' }}
               >
                 <motion.div
-                  className="flex-shrink-0"
-                  style={{ color: 'var(--primary)' }}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)', color: 'var(--primary)' }}
                   whileHover={{ rotate: -8, scale: 1.15 }}
                   transition={springFast}
                 >
                   {item.icon}
                 </motion.div>
-                <span>{item.text}</span>
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {item.title}
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {item.description}
+                  </div>
+                </div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
 
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="text-xs"
+          className="relative z-10 flex items-center gap-6 text-xs"
           style={{ color: 'var(--text-muted)' }}
         >
-          © {currentYear} PixEase
+          <Link href="/" className="inline-flex items-center gap-1.5 hover:text-[var(--text-secondary)] transition-colors">
+            <ChevronLeft className="w-3.5 h-3.5" />
+            返回首页
+          </Link>
+          <span>© {currentYear} PixEase</span>
         </motion.div>
       </div>
 
-      {/* 右侧 - 表单区域 */}
+      {/* ===== Right - Form Panel ===== */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 40, scale: 0.96 }}
@@ -265,62 +388,85 @@ export default function LoginPage() {
           transition={{ ...springGentle, delay: 0.15 }}
           className="w-full max-w-sm"
         >
-          {/* 移动端 Logo */}
+          {/* Mobile Logo */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springApple, delay: 0.2 }}
             className="lg:hidden text-center mb-10"
           >
-            <Link href="/" className="inline-flex items-center gap-2.5">
+            <Link href="/" className="inline-flex items-center gap-3">
               <motion.div
                 whileHover={{ scale: 1.1, rotate: 5 }}
                 transition={springFast}
-                className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg"
+                className="w-11 h-11 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl shadow-purple-500/25"
               >
-                <Sparkles className="w-5 h-5 text-white" />
+                <Sparkles className="w-6 h-6 text-white" />
               </motion.div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                 PixEase
               </span>
             </Link>
           </motion.div>
 
-          {/* 卡片 */}
+          {/* Card */}
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ ...springGentle, delay: 0.22 }}
-            className="rounded-3xl p-8 sm:p-10"
+            className="rounded-3xl p-8 sm:p-10 shadow-xl"
             style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
           >
-            <motion.div
-              key={authMode}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={springFast}
-              className="text-center mb-8"
-            >
-              <h2 className="text-2xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                {authMode === 'login' && '欢迎回来'}
-                {authMode === 'register' && '创建账号'}
-                {authMode === 'forgot' && '找回密码'}
-              </h2>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {authMode === 'login' && '登录您的 PixEase 账号'}
-                {authMode === 'register' && '免费注册，开始创作'}
-                {authMode === 'forgot' && '输入邮箱地址以重置密码'}
-              </p>
-            </motion.div>
+            {/* Mode Tabs */}
+            <div className="flex gap-1.5 p-1 rounded-2xl mb-8" style={{ backgroundColor: 'var(--button-bg)' }}>
+              {(['login', 'register'] as AuthMode[]).map((mode) => (
+                <motion.button
+                  key={mode}
+                  type="button"
+                  onClick={() => switchMode(mode)}
+                  whileTap={{ scale: 0.96 }}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all relative cursor-pointer ${
+                    authMode === mode ? 'text-white' : ''
+                  }`}
+                  style={authMode === mode ? { backgroundColor: 'var(--primary)' } : { color: 'var(--text-secondary)' }}
+                >
+                  {mode === 'login' ? '登录' : '注册'}
+                </motion.button>
+              ))}
+            </div>
 
+            {/* Mode Title */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={authMode}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={springFast}
+                className="text-center mb-8"
+              >
+                <h2 className="text-2xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                  {authMode === 'login' && '欢迎回来'}
+                  {authMode === 'register' && '创建账号'}
+                  {authMode === 'forgot' && '找回密码'}
+                </h2>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  {authMode === 'login' && '登录您的 PixEase 账号'}
+                  {authMode === 'register' && '免费注册，开始创作'}
+                  {authMode === 'forgot' && '输入邮箱地址以重置密码'}
+                </p>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Error Alert */}
             <AnimatePresence>
               {error && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm mb-4"
-                  style={{ backgroundColor: 'rgba(255,77,79,0.1)', color: 'var(--danger)', border: '1px solid rgba(255,77,79,0.2)' }}
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm mb-5"
+                  style={{ backgroundColor: 'rgba(255,77,79,0.08)', color: 'var(--danger)', border: '1px solid rgba(255,77,79,0.15)' }}
                 >
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   {error}
@@ -328,7 +474,7 @@ export default function LoginPage() {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
               <AnimatePresence mode="wait">
                 {/* Login Form */}
                 {authMode === 'login' && (
@@ -340,22 +486,22 @@ export default function LoginPage() {
                     transition={springFast}
                     className="space-y-4"
                   >
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: 'var(--text-muted)' }} />
-                      <input type="email" name="email" placeholder="邮箱地址" value={formData.email} onChange={handleInputChange} style={inputStyle} className="focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10" />
+                    <div className="relative group">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none transition-colors group-focus-within:text-[var(--primary)]" style={{ color: 'var(--text-muted)' }} />
+                      <input type="text" name="email" placeholder="邮箱地址" autoComplete="off" value={formData.email} onChange={handleInputChange} className={inputClass} />
                     </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: 'var(--text-muted)' }} />
-                      <input type={showPassword ? 'text' : 'password'} name="password" placeholder="密码" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: 48 }} className="focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
-                        {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none transition-colors group-focus-within:text-[var(--primary)]" style={{ color: 'var(--text-muted)' }} />
+                      <input type={showPassword ? 'text' : 'password'} name="password" placeholder="密码" autoComplete="new-password" value={formData.password} onChange={handleInputChange} className={`${inputClass} pr-12`} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-[var(--button-bg)] transition-colors cursor-pointer" style={{ color: 'var(--text-muted)' }}>
+                        {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                       </button>
                     </div>
                     <div className="flex items-start gap-2.5">
                       <motion.button
                         type="button" onClick={() => { setAgreed(!agreed); setTermsError(false); }}
                         whileTap={{ scale: 0.9 }}
-                        className={`mt-0.5 w-4.5 h-4.5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                        className={`mt-0.5 w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors ${
                           agreed ? 'border-[var(--primary)]' : 'border-[var(--text-muted)]'
                         }`}
                         style={agreed ? { backgroundColor: 'var(--primary)' } : {}}
@@ -363,26 +509,26 @@ export default function LoginPage() {
                         <AnimatePresence>
                           {agreed && (
                             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={springFast}>
-                              <Check className="w-3 h-3 text-white" />
+                              <Check className="w-3 h-3 text-white" strokeWidth={3} />
                             </motion.div>
                           )}
                         </AnimatePresence>
                       </motion.button>
                       <span className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                         我已阅读并同意
-                        <button type="button" onClick={() => setShowTerms(true)} className="mx-0.5 font-medium" style={{ color: 'var(--primary)' }}>服务条款</button>
+                        <button type="button" onClick={() => setShowTerms(true)} className="mx-0.5 font-semibold cursor-pointer" style={{ color: 'var(--primary)' }}>服务条款</button>
                         和
-                        <button type="button" onClick={() => setShowPrivacy(true)} className="mx-0.5 font-medium" style={{ color: 'var(--primary)' }}>隐私政策</button>
+                        <button type="button" onClick={() => setShowPrivacy(true)} className="mx-0.5 font-semibold cursor-pointer" style={{ color: 'var(--primary)' }}>隐私政策</button>
                       </span>
                     </div>
                     <AnimatePresence>
                       {termsError && (
                         <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                          style={{ backgroundColor: 'rgba(255,77,79,0.08)', color: 'var(--danger)' }}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs"
+                          style={{ backgroundColor: 'rgba(255,77,79,0.06)', color: 'var(--danger)' }}
                         >
                           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                           请先阅读并同意服务条款和隐私政策
@@ -402,27 +548,29 @@ export default function LoginPage() {
                     transition={springFast}
                     className="space-y-4"
                   >
-                    <div className="relative">
-                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: 'var(--text-muted)' }} />
-                      <input type="text" name="username" placeholder="用户名" value={formData.username} onChange={handleInputChange} style={inputStyle} className="focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10" />
+                    <div className="relative group">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none transition-colors group-focus-within:text-[var(--primary)]" style={{ color: 'var(--text-muted)' }} />
+                      <input type="text" name="username" placeholder="用户名" autoComplete="off" value={formData.username} onChange={handleInputChange} className={inputClass} />
                     </div>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: 'var(--text-muted)' }} />
-                      <input type="email" name="email" placeholder="邮箱地址" value={formData.email} onChange={handleInputChange} style={inputStyle} className="focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10" />
+                    <div className="relative group">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none transition-colors group-focus-within:text-[var(--primary)]" style={{ color: 'var(--text-muted)' }} />
+                      <input type="email" name="email" placeholder="邮箱地址" autoComplete="off" value={formData.email} onChange={handleInputChange} className={inputClass} />
                     </div>
-                    <div className="flex gap-2">
-                      <input type="text" name="verificationCode" placeholder="验证码" value={formData.verificationCode} onChange={handleInputChange} style={{ ...inputStyle, flex: 1, paddingLeft: 16 }} />
+                    <div className="flex gap-2.5">
+                      <div className="relative flex-1">
+                        <input type="text" name="verificationCode" placeholder="验证码" autoComplete="off" value={formData.verificationCode} onChange={handleInputChange} className={`${inputClass} pl-4`} />
+                      </div>
                       <motion.button
                         type="button" onClick={sendVerificationCode} disabled={countdown > 0 || sendingCode}
-                        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                        className="px-4 py-3 rounded-xl text-sm font-medium text-white whitespace-nowrap disabled:opacity-50"
+                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                        className="px-5 py-3.5 rounded-xl text-sm font-semibold text-white whitespace-nowrap disabled:opacity-50 cursor-pointer shadow-md"
                         style={{ backgroundColor: 'var(--primary)' }}
                       >
                         {sendingCode ? (
                           <motion.div
                             animate={{ rotate: 360 }}
                             transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-                            className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full mx-auto"
+                            className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full mx-auto"
                           />
                         ) : countdown > 0 ? (
                           `${countdown}s`
@@ -431,22 +579,22 @@ export default function LoginPage() {
                         )}
                       </motion.button>
                     </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: 'var(--text-muted)' }} />
-                      <input type={showPassword ? 'text' : 'password'} name="password" placeholder="密码" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: 48 }} className="focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
-                        {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none transition-colors group-focus-within:text-[var(--primary)]" style={{ color: 'var(--text-muted)' }} />
+                      <input type={showPassword ? 'text' : 'password'} name="password" placeholder="密码" autoComplete="new-password" value={formData.password} onChange={handleInputChange} className={`${inputClass} pr-12`} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-[var(--button-bg)] transition-colors cursor-pointer" style={{ color: 'var(--text-muted)' }}>
+                        {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                       </button>
                     </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: 'var(--text-muted)' }} />
-                      <input type="password" name="confirmPassword" placeholder="确认密码" value={formData.confirmPassword} onChange={handleInputChange} style={inputStyle} className="focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10" />
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none transition-colors group-focus-within:text-[var(--primary)]" style={{ color: 'var(--text-muted)' }} />
+                      <input type="password" name="confirmPassword" placeholder="确认密码" autoComplete="new-password" value={formData.confirmPassword} onChange={handleInputChange} className={inputClass} />
                     </div>
                     <div className="flex items-start gap-2.5">
                       <motion.button
                         type="button" onClick={() => { setAgreed(!agreed); setTermsError(false); }}
                         whileTap={{ scale: 0.9 }}
-                        className={`mt-0.5 w-4.5 h-4.5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                        className={`mt-0.5 w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors ${
                           agreed ? 'border-[var(--primary)]' : 'border-[var(--text-muted)]'
                         }`}
                         style={agreed ? { backgroundColor: 'var(--primary)' } : {}}
@@ -454,26 +602,26 @@ export default function LoginPage() {
                         <AnimatePresence>
                           {agreed && (
                             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={springFast}>
-                              <Check className="w-3 h-3 text-white" />
+                              <Check className="w-3 h-3 text-white" strokeWidth={3} />
                             </motion.div>
                           )}
                         </AnimatePresence>
                       </motion.button>
                       <span className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                         我已阅读并同意
-                        <button type="button" onClick={() => setShowTerms(true)} className="mx-0.5 font-medium" style={{ color: 'var(--primary)' }}>服务条款</button>
+                        <button type="button" onClick={() => setShowTerms(true)} className="mx-0.5 font-semibold cursor-pointer" style={{ color: 'var(--primary)' }}>服务条款</button>
                         和
-                        <button type="button" onClick={() => setShowPrivacy(true)} className="mx-0.5 font-medium" style={{ color: 'var(--primary)' }}>隐私政策</button>
+                        <button type="button" onClick={() => setShowPrivacy(true)} className="mx-0.5 font-semibold cursor-pointer" style={{ color: 'var(--primary)' }}>隐私政策</button>
                       </span>
                     </div>
                     <AnimatePresence>
                       {termsError && (
                         <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                          style={{ backgroundColor: 'rgba(255,77,79,0.08)', color: 'var(--danger)' }}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs"
+                          style={{ backgroundColor: 'rgba(255,77,79,0.06)', color: 'var(--danger)' }}
                         >
                           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                           请先阅读并同意服务条款和隐私政策
@@ -483,7 +631,7 @@ export default function LoginPage() {
                   </motion.div>
                 )}
 
-                {/* Forgot Form */}
+                {/* Forgot Password Form */}
                 {authMode === 'forgot' && (
                   <motion.div
                     key="forgot"
@@ -492,9 +640,9 @@ export default function LoginPage() {
                     exit={{ opacity: 0, x: -30 }}
                     transition={springFast}
                   >
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: 'var(--text-muted)' }} />
-                      <input type="email" name="email" placeholder="邮箱地址" value={formData.email} onChange={handleInputChange} style={inputStyle} className="focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10" />
+                    <div className="relative group">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] pointer-events-none transition-colors group-focus-within:text-[var(--primary)]" style={{ color: 'var(--text-muted)' }} />
+                      <input type="email" name="email" placeholder="请输入注册邮箱" autoComplete="off" value={formData.email} onChange={handleInputChange} className={inputClass} />
                     </div>
                   </motion.div>
                 )}
@@ -506,8 +654,11 @@ export default function LoginPage() {
                 disabled={isLoading}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
-                className="w-full py-3.5 rounded-xl font-medium text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: 'var(--primary)' }}
+                className="w-full py-3.5 rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg mt-2"
+                style={{
+                  backgroundColor: 'var(--primary)',
+                  boxShadow: '0 4px 16px color-mix(in srgb, var(--primary) 25%, transparent)',
+                }}
               >
                 {isLoading ? (
                   <motion.div
@@ -518,7 +669,7 @@ export default function LoginPage() {
                 ) : (
                   <>
                     {authMode === 'login' && '登录'}
-                    {authMode === 'register' && '注册'}
+                    {authMode === 'register' && '创建账号'}
                     {authMode === 'forgot' && '发送重置链接'}
                     <ArrowRight className="w-4 h-4" />
                   </>
@@ -532,31 +683,65 @@ export default function LoginPage() {
                     <motion.button
                       type="button" onClick={() => switchMode('forgot')}
                       whileHover={{ scale: 1.03 }}
-                      style={{ color: 'var(--text-secondary)' }}
+                      className="cursor-pointer"
+                      style={{ color: 'var(--text-muted)' }}
                     >
                       忘记密码？
                     </motion.button>
-                    <span style={{ color: 'var(--border-color)' }}>|</span>
-                    <motion.button
-                      type="button" onClick={() => switchMode('register')}
-                      whileHover={{ scale: 1.03 }}
-                      className="font-medium"
-                      style={{ color: 'var(--primary)' }}
-                    >
-                      创建账号
-                    </motion.button>
+                    <span style={{ color: 'var(--border-color)' }}>·</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      没有账号？{' '}
+                      <motion.button
+                        type="button" onClick={() => switchMode('register')}
+                        whileHover={{ scale: 1.03 }}
+                        className="font-semibold cursor-pointer"
+                        style={{ color: 'var(--primary)' }}
+                      >
+                        立即注册
+                      </motion.button>
+                    </span>
                   </div>
                 )}
                 {(authMode === 'register' || authMode === 'forgot') && (
-                  <motion.button
-                    type="button" onClick={() => switchMode('login')}
-                    whileHover={{ scale: 1.03 }}
-                    className="font-medium text-sm"
-                    style={{ color: 'var(--primary)' }}
-                  >
-                    返回登录
-                  </motion.button>
+                  <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    已有账号？{' '}
+                    <motion.button
+                      type="button" onClick={() => switchMode('login')}
+                      whileHover={{ scale: 1.03 }}
+                      className="font-semibold cursor-pointer"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      返回登录
+                    </motion.button>
+                  </div>
                 )}
+              </div>
+
+              {/* Guest Mode Entry */}
+              <div className="pt-4" style={{ borderTop: '1px solid var(--border-color)' }}>
+                <motion.button
+                  type="button"
+                  onClick={handleGuestLogin}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="w-full py-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--primary)';
+                    e.currentTarget.style.color = 'var(--primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }}
+                >
+                  <UserPlus className="w-4 h-4" />
+                  游客模式体验
+                </motion.button>
               </div>
             </form>
           </motion.div>
@@ -573,7 +758,7 @@ export default function LoginPage() {
         </motion.div>
       </div>
 
-      {/* 服务条款弹窗 */}
+      {/* ===== Terms Modal ===== */}
       <AnimatePresence>
         {showTerms && (
           <motion.div
@@ -608,7 +793,7 @@ export default function LoginPage() {
               <motion.button
                 onClick={() => setShowTerms(false)}
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                className="mt-6 w-full py-3 rounded-xl font-medium text-white"
+                className="mt-6 w-full py-3 rounded-xl font-medium text-white cursor-pointer"
                 style={{ backgroundColor: 'var(--primary)' }}
               >
                 我已了解
@@ -618,7 +803,7 @@ export default function LoginPage() {
         )}
       </AnimatePresence>
 
-      {/* 隐私政策弹窗 */}
+      {/* ===== Privacy Modal ===== */}
       <AnimatePresence>
         {showPrivacy && (
           <motion.div
@@ -651,7 +836,7 @@ export default function LoginPage() {
               <motion.button
                 onClick={() => setShowPrivacy(false)}
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                className="mt-6 w-full py-3 rounded-xl font-medium text-white"
+                className="mt-6 w-full py-3 rounded-xl font-medium text-white cursor-pointer"
                 style={{ backgroundColor: 'var(--primary)' }}
               >
                 我已了解

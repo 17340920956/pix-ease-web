@@ -14,15 +14,19 @@ import {
   ChevronDown,
   Trash2,
   AlertTriangle,
+  LogIn,
+  UserPlus,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDropdown } from '@/hooks/useDropdown';
+import { useRouter } from 'next/navigation';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
 export default function UserProfile() {
-  const { user, updateProfileAction, logout, isLoading, error, clearError } = useAuthStore();
+  const { user, isGuest, updateProfileAction, logout, isLoading, error, clearError } = useAuthStore();
   const { isOpen, toggle, close, ref } = useDropdown();
+  const router = useRouter();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -43,7 +47,42 @@ export default function UserProfile() {
     }
   }, [user, showEditModal]);
 
-  if (!user) return null;
+  if (!user) {
+    if (isGuest) {
+      return (
+        <div className="flex items-center gap-2">
+          <span
+            className="px-3 py-1.5 rounded-xl text-xs font-medium"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+              color: 'var(--primary)',
+              border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)',
+            }}
+          >
+            游客模式
+          </span>
+          <motion.button
+            onClick={() => {
+              logout();
+              router.push('/login');
+            }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
+            transition={springFast}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer"
+            style={{
+              backgroundColor: 'var(--primary)',
+              color: '#fff',
+            }}
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            登录/注册
+          </motion.button>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const displayName = user.nickname || user.userName || '用户';
 

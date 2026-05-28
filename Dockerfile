@@ -12,5 +12,22 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/out /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+RUN echo 'server { \
+    listen 80; \
+    server_name localhost; \
+    location ~ \\.(txt|rsc)$ { \
+        return 200 ""; \
+        add_header Content-Type text/plain; \
+    }  \
+    location / { \
+    root /usr/share/nginx/html;  \
+    index index.html; \
+    try_files $uri $uri.html $uri/ =404; \
+    } \
+    location /_next/static/ { \
+    root /usr/share/nginx/html; \
+    expires 1y; \
+    add_header Cache-Control "public, max-age=31536000, immutable"; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
 EXPOSE 80

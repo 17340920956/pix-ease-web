@@ -1,111 +1,123 @@
 import { create } from 'zustand';
 
-/**
- * GIF 帧数据接口
- */
 export interface GifFrame {
-  /** 帧唯一标识 */
   id: string;
-  /** 帧图像数据 */
   imageData: ImageData;
-  /** 帧延迟（毫秒） */
   delay: number;
-  /** 帧 Canvas 元素 */
   canvas?: HTMLCanvasElement;
+  hidden?: boolean;
 }
 
-/**
- * GIF 编辑状态存储接口
- */
+const MAX_HISTORY = 50;
+
 interface GifState {
-  /** 原始 GIF 文件 */
   originalFile: File | null;
-  /** 帧列表 */
   frames: GifFrame[];
-  /** 当前选中帧索引 */
   selectedFrameIndex: number;
-  /** 是否正在处理 */
   isProcessing: boolean;
-  /** 处理进度 */
   progress: number;
-  /** 播放速度 */
   playbackSpeed: number;
-  /** 是否显示设置 */
   showSettings: boolean;
-  /** 帧列表是否展开 */
   framesExpanded: boolean;
-  /** 设置原始文件 */
+
+  history: GifFrame[][];
+  historyIndex: number;
+
   setOriginalFile: (file: File | null) => void;
-  /** 设置帧列表 */
   setFrames: (frames: GifFrame[]) => void;
-  /** 添加单帧 */
   addFrame: (frame: GifFrame, index?: number) => void;
-  /** 批量添加帧 */
   addFrames: (newFrames: GifFrame[]) => void;
-  /** 删除帧 */
   removeFrame: (index: number) => void;
-  /** 更新帧 */
   updateFrame: (index: number, updates: Partial<GifFrame>) => void;
-  /** 移动帧 */
   moveFrame: (fromIndex: number, toIndex: number) => void;
-  /** 重新排序帧 */
   reorderFrames: (frames: GifFrame[]) => void;
-  /** 设置选中帧 */
   setSelectedFrameIndex: (index: number) => void;
-  /** 设置处理状态 */
   setIsProcessing: (processing: boolean) => void;
-  /** 设置进度 */
   setProgress: (progress: number) => void;
-  /** 设置播放速度 */
   setPlaybackSpeed: (speed: number) => void;
-  /** 设置显示设置 */
   setShowSettings: (show: boolean) => void;
-  /** 设置帧列表展开 */
   setFramesExpanded: (expanded: boolean) => void;
-  /** 重置状态 */
+
+  toggleFrameHidden: (index: number) => void;
+  unhideAllFrames: () => void;
+  undo: () => void;
+  redo: () => void;
+
   reset: () => void;
 }
 
-/**
- * GIF 编辑状态管理 Store
- * 管理 GIF 编辑过程中的所有状态
- */
-export const useGifStore = create<GifState>((set) => ({
-  originalFile: null,
-  frames: [],
+const initialState = {
+  originalFile: null as File | null,
+  frames: [] as GifFrame[],
   selectedFrameIndex: 0,
   isProcessing: false,
   progress: 0,
   playbackSpeed: 1,
   showSettings: false,
   framesExpanded: false,
+  history: [] as GifFrame[][],
+  historyIndex: -1,
+};
+
+export const useGifStore = create<GifState>((set, get) => ({
+  ...initialState,
+
   setOriginalFile: (file) => set({ originalFile: file }),
-  setFrames: (frames) => set({ frames }),
+
+  setFrames: (frames) =>
+    set((state) => {
+      const newHistory = state.history.slice(0, state.historyIndex + 1);
+      newHistory.push(state.frames.map((f) => ({ ...f })));
+      if (newHistory.length > MAX_HISTORY) newHistory.shift();
+      return { frames, history: newHistory, historyIndex: newHistory.length - 1 };
+    }),
+
   addFrame: (frame, index) =>
     set((state) => {
+      const newHistory = state.history.slice(0, state.historyIndex + 1);
+      newHistory.push(state.frames.map((f) => ({ ...f })));
+      if (newHistory.length > MAX_HISTORY) newHistory.shift();
       const newFrames = [...state.frames];
       if (index !== undefined) {
         newFrames.splice(index, 0, frame);
       } else {
         newFrames.push(frame);
       }
-      return { frames: newFrames };
+      return { frames: newFrames, history: newHistory, historyIndex: newHistory.length - 1 };
     }),
+
   addFrames: (newFrames) =>
-    set((state) => ({
-      frames: [...state.frames, ...newFrames],
-    })),
+    set((state) => {
+      const newHistory = state.history.slice(0, state.historyIndex + 1);
+      newHistory.push(state.frames.map((f) => ({ ...f })));
+      if (newHistory.length > MAX_HISTORY) newHistory.shift();
+      return {
+        frames: [...state.frames, ...newFrames],
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+      };
+    }),
+
   removeFrame: (index) =>
-    set((state) => ({
-      frames: state.frames.filter((_, i) => i !== index),
-      selectedFrameIndex: Math.min(state.selectedFrameIndex, state.frames.length - 2),
-    })),
+    set((state) => {
+      const newHistory = state.history.slice(0, state.historyIndex + 1);
+      newHistory.push(state.frames.map((f) => ({ ...f })));
+      if (newHistory.length > MAX_HISTORY) newHistory.shift();
+      return {
+        frames: state.frames.filter((_, i) => i !== index),
+        selectedFrameIndex: Math.min(state.selectedFrameIndex, state.frames.length - 2),
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+      };
+    }),
+
   updateFrame: (index, updates) =>
     set((state) => ({
       frames: state.frames.map((frame, i) =>
         i === index ? { ...frame, ...updates } : frame
       ),
     })),
+
   moveFrame: (fromIndex, toIndex) =>
     set((state) => {
       const newFrames = [...state.frames];
@@ -113,22 +125,58 @@ export const useGifStore = create<GifState>((set) => ({
       newFrames.splice(toIndex, 0, movedFrame);
       return { frames: newFrames };
     }),
-  reorderFrames: (frames) => set({ frames }),
+
+  reorderFrames: (frames) =>
+    set((state) => {
+      const newHistory = state.history.slice(0, state.historyIndex + 1);
+      newHistory.push(state.frames.map((f) => ({ ...f })));
+      if (newHistory.length > MAX_HISTORY) newHistory.shift();
+      return { frames, history: newHistory, historyIndex: newHistory.length - 1 };
+    }),
+
   setSelectedFrameIndex: (index) => set({ selectedFrameIndex: index }),
   setIsProcessing: (processing) => set({ isProcessing: processing }),
   setProgress: (progress) => set({ progress }),
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
   setShowSettings: (show) => set({ showSettings: show }),
   setFramesExpanded: (expanded) => set({ framesExpanded: expanded }),
+
+  toggleFrameHidden: (index) =>
+    set((state) => ({
+      frames: state.frames.map((frame, i) =>
+        i === index ? { ...frame, hidden: !frame.hidden } : frame
+      ),
+    })),
+
+  unhideAllFrames: () =>
+    set((state) => ({
+      frames: state.frames.map((f) => ({ ...f, hidden: false })),
+    })),
+
+  undo: () => {
+    const { history, historyIndex } = get();
+    if (historyIndex < 0) return;
+    const prevFrames = history[historyIndex].map((f) => ({ ...f }));
+    set({
+      frames: prevFrames,
+      historyIndex: historyIndex - 1,
+      selectedFrameIndex: Math.min(get().selectedFrameIndex, Math.max(0, prevFrames.length - 1)),
+    });
+  },
+
+  redo: () => {
+    const { history, historyIndex } = get();
+    if (historyIndex >= history.length - 1) return;
+    const nextFrames = history[historyIndex + 1].map((f) => ({ ...f }));
+    set({
+      frames: nextFrames,
+      historyIndex: historyIndex + 1,
+      selectedFrameIndex: Math.min(get().selectedFrameIndex, Math.max(0, nextFrames.length - 1)),
+    });
+  },
+
   reset: () =>
     set({
-      originalFile: null,
-      frames: [],
-      selectedFrameIndex: 0,
-      isProcessing: false,
-      progress: 0,
-      playbackSpeed: 1,
-      showSettings: false,
-      framesExpanded: false,
+      ...initialState,
     }),
 }));

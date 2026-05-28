@@ -26,11 +26,13 @@ export interface User {
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  isGuest: boolean;
   isLoading: boolean;
   error: string | null;
   setUser: (user: User | null) => void;
   updateUser: (updates: Partial<User>) => void;
   setIsAuthenticated: (status: boolean) => void;
+  setGuest: (guest: boolean) => void;
   setIsLoading: (loading: boolean) => void;
   logout: () => void;
   loginAction: (account: string, password: string) => Promise<void>;
@@ -47,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
+      isGuest: false,
       isLoading: false,
       error: null,
 
@@ -56,13 +59,14 @@ export const useAuthStore = create<AuthState>()(
       user: state.user ? { ...state.user, ...updates, updateTime: new Date().toISOString() } : null,
     })),
       setIsAuthenticated: (status) => set({ isAuthenticated: status }),
+      setGuest: (guest) => set({ isGuest: guest }),
       setIsLoading: (loading) => set({ isLoading: loading }),
       logout: () => {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
           document.cookie = 'auth=; path=/; max-age=0';
         }
-        set({ user: null, isAuthenticated: false, error: null });
+        set({ user: null, isAuthenticated: false, isGuest: false, error: null });
       },
       clearError: () => set({ error: null }),
       setError: (error: string | null) => set({ error }),
@@ -182,7 +186,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated, isGuest: state.isGuest }),
       onRehydrateStorage: () => {
         return (state) => {
           if (state && state.isAuthenticated && !state.user) {

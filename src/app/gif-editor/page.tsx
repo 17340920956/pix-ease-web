@@ -15,6 +15,10 @@ import {
   Images,
   Repeat,
   Plus,
+  Eye,
+  EyeOff,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import { useGifStore } from '@/store/useGifStore';
 import { parseGifFileAdvanced, generateGifBlob, downloadFile, reverseFrames } from '@/lib/gifUtils';
@@ -31,7 +35,7 @@ const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass:
  */
 export default function GifEditorPage() {
   return (
-    <AuthGuard>
+    <AuthGuard allowGuest>
       <GifEditorContent />
     </AuthGuard>
   );
@@ -51,6 +55,10 @@ function GifEditorContent() {
     setSelectedFrameIndex,
     setPlaybackSpeed,
     reset,
+    undo,
+    redo,
+    toggleFrameHidden,
+    unhideAllFrames,
   } = useGifStore();
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -182,38 +190,60 @@ function GifEditorContent() {
   const startPlayback = useCallback(() => {
     if (frames.length === 0) return;
 
+    const allFrames = frames;
+    const visibleFrames = allFrames.filter((f) => !f.hidden);
+    if (visibleFrames.length === 0) return;
+
+    const currentIdx = playbackStateRef.current.frameIndex;
+    const currentFrame = allFrames[currentIdx];
+    const shouldStartFromCurrent = currentIdx >= 0 && currentIdx < allFrames.length && currentFrame && !currentFrame.hidden;
+
+    const startIndex = shouldStartFromCurrent
+      ? currentIdx
+      : allFrames.findIndex((f) => !f.hidden);
+
     playbackStateRef.current.isPlaying = true;
-    playbackStateRef.current.frameIndex = 0;
-    setSelectedFrameIndex(0);
+    playbackStateRef.current.frameIndex = startIndex;
+    setSelectedFrameIndex(startIndex);
     setIsPlaying(true);
+
+    const findNextVisible = (fromIndex: number) => {
+      for (let i = fromIndex + 1; i < allFrames.length; i++) {
+        if (!allFrames[i].hidden) return i;
+      }
+      return -1;
+    };
+
+    const findFirstVisible = () => {
+      return allFrames.findIndex((f) => !f.hidden);
+    };
 
     const playNext = () => {
       if (!playbackStateRef.current.isPlaying) return;
 
       const currentIndex = playbackStateRef.current.frameIndex;
+      const nextVisible = findNextVisible(currentIndex);
 
-      if (currentIndex >= frames.length - 1) {
+      if (nextVisible === -1) {
         if (!loopRef.current) {
-          // Not looping: stop after showing last frame
           setTimeout(() => {
             playbackStateRef.current.isPlaying = false;
             setIsPlaying(false);
-          }, (frames[currentIndex]?.delay || 100) / playbackSpeed);
+          }, (allFrames[currentIndex]?.delay || 100) / playbackSpeed);
           return;
         }
-        // Looping: wrap to first frame
-        playbackStateRef.current.frameIndex = 0;
-        setSelectedFrameIndex(0);
-        const delay = frames[0]?.delay || 100;
+        const firstIdx = findFirstVisible();
+        playbackStateRef.current.frameIndex = firstIdx;
+        setSelectedFrameIndex(firstIdx);
+        const delay = allFrames[firstIdx]?.delay || 100;
         playbackTimerRef.current = setTimeout(playNext, delay / playbackSpeed);
         return;
       }
 
-      const nextIndex = currentIndex + 1;
-      playbackStateRef.current.frameIndex = nextIndex;
-      setSelectedFrameIndex(nextIndex);
+      playbackStateRef.current.frameIndex = nextVisible;
+      setSelectedFrameIndex(nextVisible);
 
-      const delay = frames[nextIndex]?.delay || 100;
+      const delay = allFrames[nextVisible]?.delay || 100;
       playbackTimerRef.current = setTimeout(playNext, delay / playbackSpeed);
     };
 
@@ -615,15 +645,47 @@ function GifEditorContent() {
                       {frames.length}
                     </span>
                   </div>
-                  <motion.button
-                    onClick={() => frameInputRef.current?.click()}
-                    whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                    style={{ backgroundColor: 'var(--success)', color: '#ffffff' }}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    添加帧
-                  </motion.button>
+                  <div className="flex items-center gap-1">
+                    {frames.some((f) => f.hidden) && (
+                      <motion.button
+                        onClick={unhideAllFrames}
+                        whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                        style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}
+                        title="取消全部隐藏"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        取消隐藏
+                      </motion.button>
+                    )}
+                    <motion.button
+                      onClick={undo}
+                      whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                      className="flex items-center gap-1 px-1.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                      style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}
+                      title="撤销"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                    </motion.button>
+                    <motion.button
+                      onClick={redo}
+                      whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                      className="flex items-center gap-1 px-1.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                      style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}
+                      title="重做"
+                    >
+                      <Redo2 className="w-3.5 h-3.5" />
+                    </motion.button>
+                    <motion.button
+                      onClick={() => frameInputRef.current?.click()}
+                      whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={springFast}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                      style={{ backgroundColor: 'var(--success)', color: '#ffffff' }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      添加帧
+                    </motion.button>
+                  </div>
                 </div>
 
                 <input
@@ -647,11 +709,11 @@ function GifEditorContent() {
                             onDragLeave={handleDragLeave}
                             onDrop={(e) => handleDrop(e, index)}
                             onDragEnd={handleDragEnd}
-                            className="cursor-move rounded-lg overflow-hidden transition-transform group"
+                            className="cursor-move rounded-lg overflow-hidden transition-transform group relative"
                             style={{
                               outline: index === selectedFrameIndex ? '3px solid var(--primary)' : 'none',
                               outlineOffset: -1,
-                              opacity: draggingIndex === index ? 0.5 : 1,
+                              opacity: draggingIndex === index ? 0.5 : frame.hidden ? 0.35 : 1,
                               transform: 'scale(1)',
                             }}
                             onClick={() => {
@@ -671,6 +733,18 @@ function GifEditorContent() {
                               )}
                               <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-tl">{index + 1}</div>
                               <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <motion.button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFrameHidden(index);
+                                  }}
+                                  whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} transition={springFast}
+                                  className="p-1 rounded cursor-pointer"
+                                  style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: '#ffffff' }}
+                                  title={frame.hidden ? '显示帧' : '隐藏帧'}
+                                >
+                                  {frame.hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </motion.button>
                                 <motion.button
                                   onClick={(e) => {
                                     e.stopPropagation();

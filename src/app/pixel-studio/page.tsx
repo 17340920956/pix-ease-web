@@ -14,7 +14,7 @@ import TopMenuBar from './components/TopMenuBar';
 
 export default function PixelStudioPage() {
   return (
-    <AuthGuard>
+    <AuthGuard allowGuest>
       <PixelStudioContent />
     </AuthGuard>
   );
@@ -39,6 +39,84 @@ function PixelStudioContent() {
   const [exportPixelSize, setExportPixelSize] = useState(8);
   const [showBorder, setShowBorder] = useState(false);
   const [borderSize, setBorderSize] = useState(1);
+  const [showGrid, setShowGrid] = useState(false);
+  const [gridColor, setGridColor] = useState('#666666');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const generateExportDataUrl = useCallback((pixelSize: number, withBorder: boolean, bSize: number, withGrid: boolean, gColor: string) => {
+    const allPixels = new Map<string, string>();
+    for (const layer of store.layers) {
+      if (!layer.visible) continue;
+      const layerPixels = layer.pixels instanceof Map ? layer.pixels : new Map<string, string>(Object.entries(layer.pixels || {} as Record<string, string>));
+      layerPixels.forEach((color, key) => {
+        if (!allPixels.has(key)) allPixels.set(key, color);
+      });
+    }
+
+    if (allPixels.size === 0) return { dataUrl: '', w: 0, h: 0 };
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    allPixels.forEach((_, key) => {
+      const [x, y] = key.split(',').map(Number);
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    });
+
+    const contentW = maxX - minX + 1;
+    const contentH = maxY - minY + 1;
+    const borderPx = withBorder ? bSize : 0;
+    const canvas = document.createElement('canvas');
+    canvas.width = (contentW + borderPx * 2) * pixelSize;
+    canvas.height = (contentH + borderPx * 2) * pixelSize;
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = false;
+
+    if (withBorder && bSize > 0) {
+      ctx.fillStyle = store.project.backgroundColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    allPixels.forEach((color, key) => {
+      const [x, y] = key.split(',').map(Number);
+      const dx = (x - minX + borderPx) * pixelSize;
+      const dy = (y - minY + borderPx) * pixelSize;
+      ctx.fillStyle = color;
+      ctx.fillRect(dx, dy, pixelSize, pixelSize);
+    });
+
+    if (withGrid && pixelSize > 1) {
+      ctx.strokeStyle = gColor;
+      ctx.lineWidth = 1;
+      for (let col = 0; col <= contentW; col++) {
+        const x = (col + borderPx) * pixelSize + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let row = 0; row <= contentH; row++) {
+        const y = (row + borderPx) * pixelSize + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+    }
+
+    return { dataUrl: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height };
+  }, [store]);
+
+  const debouncedUpdatePreview = useCallback((pixelSize: number, withBorder: boolean, bSize: number, withGrid: boolean, gColor: string) => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      const result = generateExportDataUrl(pixelSize, withBorder, bSize, withGrid, gColor);
+      setPreviewDataUrl(result.dataUrl);
+      setPreviewW(result.w);
+      setPreviewH(result.h);
+    }, 60);
+  }, [generateExportDataUrl]);
 
   useEffect(() => {
     const hasContent = store.layers.some((l) => {
@@ -156,54 +234,8 @@ function PixelStudioContent() {
     setShowCreateDialog(false);
   }, [dialogW, dialogH, store]);
 
-  const generateExportDataUrl = useCallback((pixelSize: number, withBorder: boolean, bSize: number) => {
-    const allPixels = new Map<string, string>();
-    for (const layer of store.layers) {
-      if (!layer.visible) continue;
-      const layerPixels = layer.pixels instanceof Map ? layer.pixels : new Map<string, string>(Object.entries(layer.pixels || {} as Record<string, string>));
-      layerPixels.forEach((color, key) => {
-        if (!allPixels.has(key)) allPixels.set(key, color);
-      });
-    }
-
-    if (allPixels.size === 0) return { dataUrl: '', w: 0, h: 0 };
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    allPixels.forEach((_, key) => {
-      const [x, y] = key.split(',').map(Number);
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    });
-
-    const contentW = maxX - minX + 1;
-    const contentH = maxY - minY + 1;
-    const borderPx = withBorder ? bSize : 0;
-    const canvas = document.createElement('canvas');
-    canvas.width = (contentW + borderPx * 2) * pixelSize;
-    canvas.height = (contentH + borderPx * 2) * pixelSize;
-    const ctx = canvas.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-
-    if (withBorder && bSize > 0) {
-      ctx.fillStyle = store.project.backgroundColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    allPixels.forEach((color, key) => {
-      const [x, y] = key.split(',').map(Number);
-      const dx = (x - minX + borderPx) * pixelSize;
-      const dy = (y - minY + borderPx) * pixelSize;
-      ctx.fillStyle = color;
-      ctx.fillRect(dx, dy, pixelSize, pixelSize);
-    });
-
-    return { dataUrl: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height };
-  }, [store]);
-
   const handleExportPng = useCallback(() => {
-    const result = generateExportDataUrl(exportPixelSize, showBorder, borderSize);
+    const result = generateExportDataUrl(exportPixelSize, showBorder, borderSize, showGrid, gridColor);
     setPreviewDataUrl(result.dataUrl);
     setPreviewW(result.w);
     setPreviewH(result.h);
@@ -608,11 +640,26 @@ function PixelStudioContent() {
             </div>
 
             <div className="flex flex-col md:flex-row">
-              <div className="p-4 flex items-center justify-center min-w-[200px]" style={{ backgroundColor: 'var(--background)' }}>
+              <div
+                className="p-4 flex items-center justify-center overflow-hidden"
+                style={{
+                  backgroundColor: 'var(--background)',
+                  width: '380px',
+                  height: '320px',
+                  maxWidth: '60vw',
+                  maxHeight: '50vh',
+                }}
+              >
                 <img
                   src={previewDataUrl}
                   alt="预览"
-                  style={{ imageRendering: 'pixelated', maxWidth: '70vw', maxHeight: '50vh' }}
+                  className="transition-opacity duration-200"
+                  style={{
+                    imageRendering: 'pixelated',
+                    maxWidth: 'calc(100% - 32px)',
+                    maxHeight: 'calc(100% - 32px)',
+                    objectFit: 'contain',
+                  }}
                 />
               </div>
 
@@ -629,10 +676,7 @@ function PixelStudioContent() {
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       setExportPixelSize(val);
-                      const result = generateExportDataUrl(val, showBorder, borderSize);
-                      setPreviewDataUrl(result.dataUrl);
-                      setPreviewW(result.w);
-                      setPreviewH(result.h);
+                      debouncedUpdatePreview(val, showBorder, borderSize, showGrid, gridColor);
                     }}
                     className="w-full"
                   />
@@ -645,7 +689,7 @@ function PixelStudioContent() {
                       checked={showBorder}
                       onChange={(e) => {
                         setShowBorder(e.target.checked);
-                        const result = generateExportDataUrl(exportPixelSize, e.target.checked, borderSize);
+                        const result = generateExportDataUrl(exportPixelSize, e.target.checked, borderSize, showGrid, gridColor);
                         setPreviewDataUrl(result.dataUrl);
                         setPreviewW(result.w);
                         setPreviewH(result.h);
@@ -669,10 +713,7 @@ function PixelStudioContent() {
                       onChange={(e) => {
                         const val = Number(e.target.value);
                         setBorderSize(val);
-                        const result = generateExportDataUrl(exportPixelSize, true, val);
-                        setPreviewDataUrl(result.dataUrl);
-                        setPreviewW(result.w);
-                        setPreviewH(result.h);
+                        debouncedUpdatePreview(exportPixelSize, true, val, showGrid, gridColor);
                       }}
                       className="w-full"
                     />
@@ -681,6 +722,35 @@ function PixelStudioContent() {
 
                 <div className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
                   边框颜色 = 画布背景 ({store.project.backgroundColor})
+                </div>
+
+                <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={showGrid}
+                      onChange={(e) => {
+                        setShowGrid(e.target.checked);
+                        debouncedUpdatePreview(exportPixelSize, showBorder, borderSize, e.target.checked, gridColor);
+                      }}
+                      className="w-3.5 h-3.5 rounded accent-[var(--primary)]"
+                    />
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>显示网格</span>
+                  </div>
+                  {showGrid && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>颜色</span>
+                      <input
+                        type="color"
+                        value={gridColor}
+                        onChange={(e) => {
+                          setGridColor(e.target.value);
+                          debouncedUpdatePreview(exportPixelSize, showBorder, borderSize, true, e.target.value);
+                        }}
+                        className="w-5 h-5 rounded border-0 p-0 cursor-pointer"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 mt-auto pt-2 border-t" style={{ borderColor: 'var(--border-color)' }}>

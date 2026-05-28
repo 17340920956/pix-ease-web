@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
     rules: {},
   },
   reactStrictMode: false,
+  experimental: {
+    ppr: false,
+  },
   devIndicators: {
     appIsrStatus: false,
     buildActivity: false,
