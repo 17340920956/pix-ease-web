@@ -1,6 +1,6 @@
 'use client';
 
-import { Palette, ChevronDown, ChevronRight } from 'lucide-react';
+import { Palette, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { BeadColor, BeadShape, QualityTier } from '@/lib/bead/types';
@@ -66,6 +66,7 @@ interface RightPanelProps {
   maxColorLimit: number | '';
   hasGenerated: boolean;
   colorStatLength: number;
+  onClose?: () => void;
   onBrandChange: (v: string) => void;
   onQualityTierChange: (v: QualityTier) => void;
   onCustomGridSizeChange: (v: number | '') => void;
@@ -82,7 +83,7 @@ interface RightPanelProps {
 
 export default function RightPanel({
   brand, qualityTier, customGridSize, removeBg, useDithering, removeTransitionColors, transitionColorThreshold, beadShape,
-  maxColorLimit, hasGenerated, colorStatLength, showGridLines,
+  maxColorLimit, hasGenerated, colorStatLength, showGridLines, onClose,
   onBrandChange, onQualityTierChange, onCustomGridSizeChange, onApplyCustomGrid, onRemoveBgChange, onDitheringChange,
   onRemoveTransitionColorsChange, onTransitionColorThresholdChange,
   onBeadShapeChange, onShowGridLinesChange, onMaxColorLimitChange, onApplyColorLimit,
@@ -94,6 +95,14 @@ export default function RightPanel({
 
   return (
     <div className="w-72 flex-shrink-0 overflow-y-auto border-l flex flex-col" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
+      {onClose && (
+        <div className="flex items-center justify-between p-3 border-b md:hidden" style={{ borderColor: 'var(--border-color)' }}>
+          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>图纸设置</span>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5" style={{ color: 'var(--text-secondary)' }} />
+          </button>
+        </div>
+      )}
       <div className="p-4 space-y-5">
         <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <Palette className="w-4 h-4" />

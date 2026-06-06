@@ -5,6 +5,7 @@ import {
   Pipette, Pencil, ZoomIn, ZoomOut, RotateCcw, Undo2, Redo2,
   AlignVerticalJustifyCenter, AlignHorizontalJustifyCenter, Grid3X3,
   LayoutGrid, Eye, EyeOff, PaintBucket, Eraser, MousePointer2,
+  Palette, Image, Settings,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthGuard from '@/components/AuthGuard';
@@ -182,7 +183,7 @@ function PerlerBeadContent() {
   const [renderVersion, setRenderVersion] = useState(0);
 
   // --- 画布交互 ---
-  const [activeTool, setActiveTool] = useState<'brush' | 'picker' | 'fill' | 'eraser' | 'select' | null>(null);
+  const [activeTool, setActiveTool] = useState<'brush' | 'picker' | 'fill' | 'eraser' | null>(null);
   const [brushColor, setBrushColor] = useState<string>('#212121');
   const [brushCode, setBrushCode] = useState<string>('');
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -191,9 +192,6 @@ function PerlerBeadContent() {
   const [maxColorLimit, setMaxColorLimit] = useState<number | ''>('');
   const [history, setHistory] = useState<Map<string, string>[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [selection, setSelection] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
-  const isSelectingRef = useRef(false);
-  const selectStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // --- 对称模式 ---
   const [symmetryMode, setSymmetryMode] = useState<'none' | 'horizontal' | 'vertical' | 'four-way'>('none');
@@ -201,6 +199,9 @@ function PerlerBeadContent() {
   // --- 辅助线 ---
   const [showCenterLines, setShowCenterLines] = useState(false);
   const [showGridLines, setShowGridLines] = useState<boolean>(true);
+
+  // --- 移动端面板控制 ---
+  const [mobilePanel, setMobilePanel] = useState<'none' | 'left' | 'right'>('none');
 
   // --- 派生数据 ---
   const maxDim = customGridSize !== '' && customGridSize >= 1 ? Math.min(300, customGridSize) : QUALITY_DIMS[qualityTier];
@@ -662,7 +663,7 @@ function PerlerBeadContent() {
     const data = exportDataRef.current;
     if (!data || !previewCanvasRef.current) return;
     renderPreview(data.bw, data.bh, beadMapRef.current, data.paletteColors, beadShape);
-  }, [beadShape, renderVersion, zoomLevel, panOffset, showCenterLines, showGridLines, selection, activeTool]);
+  }, [beadShape, renderVersion, zoomLevel, panOffset, showCenterLines, showGridLines]);
 
   const renderPreview = useCallback(
     (w: number, h: number, beadMap: Map<string, string>, _colors: BeadColor[], shape: BeadShape) => {
@@ -816,62 +817,9 @@ function PerlerBeadContent() {
         ctx.restore();
       }
 
-      // 框选矩形（注意：ctx 已通过 translate(panOffset.x, panOffset.y) 偏移，无需重复添加）
-      if (selection && activeTool === 'select') {
-        const xMin = Math.min(selection.x1, selection.x2);
-        const xMax = Math.max(selection.x1, selection.x2);
-        const yMin = Math.min(selection.y1, selection.y2);
-        const yMax = Math.max(selection.y1, selection.y2);
-
-        const rx = margin + xMin * cellSize;
-        const ry = margin + yMin * cellSize;
-        const rw = (xMax - xMin + 1) * cellSize;
-        const rh = (yMax - yMin + 1) * cellSize;
-
-        ctx.save();
-
-        // 半透明蓝色遮罩
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
-        ctx.fillRect(rx, ry, rw, rh);
-
-        // 蓝色虚线边框 — 加粗明显
-        ctx.strokeStyle = '#2563eb';
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([6, 4]);
-        ctx.lineDashOffset = (Date.now() / 50) % 10; // 流动效果
-        ctx.strokeRect(rx, ry, rw, rh);
-
-        // 四角白色 L 形标记（类似 PS 选区）
-        const cs = Math.max(6, Math.min(12, cellSize));
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([]);
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.shadowBlur = 2;
-
-        // 左上
-        ctx.beginPath();
-        ctx.moveTo(rx, ry + cs); ctx.lineTo(rx, ry); ctx.lineTo(rx + cs, ry);
-        ctx.stroke();
-        // 右上
-        ctx.beginPath();
-        ctx.moveTo(rx + rw - cs, ry); ctx.lineTo(rx + rw, ry); ctx.lineTo(rx + rw, ry + cs);
-        ctx.stroke();
-        // 左下
-        ctx.beginPath();
-        ctx.moveTo(rx, ry + rh - cs); ctx.lineTo(rx, ry + rh); ctx.lineTo(rx + cs, ry + rh);
-        ctx.stroke();
-        // 右下
-        ctx.beginPath();
-        ctx.moveTo(rx + rw - cs, ry + rh); ctx.lineTo(rx + rw, ry + rh); ctx.lineTo(rx + rw, ry + rh - cs);
-        ctx.stroke();
-
-        ctx.restore();
-      }
-
       ctx.restore();
     },
-    [zoomLevel, panOffset, showCenterLines, showGridLines, selection, activeTool],
+    [zoomLevel, panOffset, showCenterLines, showGridLines],
   );
 
   // ========================================================
@@ -944,11 +892,7 @@ function PerlerBeadContent() {
     if (!data) return;
     const bm = beadMapRef.current;
 
-    if (activeTool === 'select') {
-      isSelectingRef.current = true;
-      selectStartRef.current = { x: pos.x, y: pos.y };
-      setSelection({ x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y });
-    } else if (activeTool === 'picker') {
+    if (activeTool === 'picker') {
       const color = bm.get(`${pos.x},${pos.y}`);
       if (color) {
         setBrushColor(color);
@@ -989,14 +933,6 @@ function PerlerBeadContent() {
       setPanOffset({ x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y });
       return;
     }
-    // 框选工具
-    if (activeTool === 'select' && isSelectingRef.current) {
-      const pos = canvasToBead(e.clientX, e.clientY);
-      if (pos) {
-        setSelection(prev => prev ? { ...prev, x2: pos.x, y2: pos.y } : null);
-      }
-      return;
-    }
     if (!hasGenerated || (activeTool !== 'brush' && activeTool !== 'eraser') || e.buttons !== 1) return;
     const pos = canvasToBead(e.clientX, e.clientY);
     if (!pos) return;
@@ -1020,33 +956,6 @@ function PerlerBeadContent() {
 
   const handleCanvasMouseUp = useCallback(() => {
     if (isPanning) setIsPanning(false);
-    if (isSelectingRef.current) {
-      isSelectingRef.current = false;
-    }
-  }, []);
-
-  // 删除选区内的豆子
-  const handleDeleteSelection = useCallback(() => {
-    if (!selection) return;
-    const data = exportDataRef.current;
-    if (!data) return;
-    const bm = beadMapRef.current;
-    const xMin = Math.min(selection.x1, selection.x2);
-    const xMax = Math.max(selection.x1, selection.x2);
-    const yMin = Math.min(selection.y1, selection.y2);
-    const yMax = Math.max(selection.y1, selection.y2);
-    for (let y = yMin; y <= yMax; y++) {
-      for (let x = xMin; x <= xMax; x++) {
-        bm.delete(`${x},${y}`);
-      }
-    }
-    applyBrushChange(bm);
-    setSelection(null);
-  }, [selection, applyBrushChange]);
-
-  // 取消选区
-  const handleClearSelection = useCallback(() => {
-    setSelection(null);
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -1100,9 +1009,6 @@ function PerlerBeadContent() {
             break;
           case 'f':
             setActiveTool(t => t === 'fill' ? null : 'fill');
-            break;
-          case 's':
-            setActiveTool(t => t === 'select' ? null : 'select');
             break;
           case '1':
             setSymmetryMode('none');
@@ -1529,11 +1435,20 @@ function PerlerBeadContent() {
       <TopHeader />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* 左侧：原图 + 色卡 */}
-        <LeftPanel imageUrl={imageUrl} colorStats={colorStats} totalBeads={totalBeads} />
+        {/* 左侧：原图 + 色卡 — 桌面端常驻，移动端按需显示 */}
+        {mobilePanel !== 'right' && (
+          <div className={`${mobilePanel === 'left' ? 'flex' : 'hidden'} md:flex`}>
+            <LeftPanel
+              imageUrl={imageUrl}
+              colorStats={colorStats}
+              totalBeads={totalBeads}
+              onClose={() => setMobilePanel('none')}
+            />
+          </div>
+        )}
 
         {/* 中间：上传 / 预览 */}
-        <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
+        <div className="flex-1 flex flex-col overflow-hidden p-4 md:p-6 gap-3 md:gap-4 min-w-0">
           <AnimatePresence mode="wait">
             {!imageUrl ? (
               <UploadZone
@@ -1568,62 +1483,37 @@ function PerlerBeadContent() {
 
                 {hasGenerated ? (
                   <div className="flex-1 flex flex-col min-h-0 gap-2">
-                    {/* 工具栏 */}
-                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                      {/* 工具按钮 */}
+                    {/* 工具栏 — 桌面端换行，移动端横向滚动 */}
+                    <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto md:flex-wrap pb-1 md:pb-0 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {/* 工具按钮 — 移动端只显示图标 */}
                       <ToolButton
                         active={activeTool === 'brush'}
                         onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
                         label="画笔工具 (B)"
                       >
-                        <Pencil className="w-3.5 h-3.5" />画笔
+                        <Pencil className="w-3.5 h-3.5" /><span className="hidden md:inline">画笔</span>
                       </ToolButton>
                       <ToolButton
                         active={activeTool === 'eraser'}
                         onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')}
                         label="橡皮擦 (E)"
                       >
-                        <Eraser className="w-3.5 h-3.5" />橡皮擦
+                        <Eraser className="w-3.5 h-3.5" /><span className="hidden md:inline">橡皮擦</span>
                       </ToolButton>
                       <ToolButton
                         active={activeTool === 'picker'}
                         onClick={() => setActiveTool(t => t === 'picker' ? null : 'picker')}
                         label="取色器 (I)"
                       >
-                        <Pipette className="w-3.5 h-3.5" />取色
+                        <Pipette className="w-3.5 h-3.5" /><span className="hidden md:inline">取色</span>
                       </ToolButton>
                       <ToolButton
                         active={activeTool === 'fill'}
                         onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
                         label="油漆桶 (F)"
                       >
-                        <PaintBucket className="w-3.5 h-3.5" />油漆桶
+                        <PaintBucket className="w-3.5 h-3.5" /><span className="hidden md:inline">油漆桶</span>
                       </ToolButton>
-                      <ToolButton
-                        active={activeTool === 'select'}
-                        onClick={() => setActiveTool(t => t === 'select' ? null : 'select')}
-                        label="框选工具 (S)"
-                      >
-                        <MousePointer2 className="w-3.5 h-3.5" />框选
-                      </ToolButton>
-                      {selection && (
-                        <>
-                          <button
-                            onClick={handleDeleteSelection}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-white"
-                            style={{ backgroundColor: '#ef4444' }}
-                          >
-                            删除选区
-                          </button>
-                          <button
-                            onClick={handleClearSelection}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-medium border"
-                            style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-color)', backgroundColor: 'var(--background)' }}
-                          >
-                            取消选区
-                          </button>
-                        </>
-                      )}
                       {brushColor && (activeTool === 'brush' || activeTool === 'fill') && (
                         <Tooltip text={`当前颜色: ${brushCode || brushColor}`}>
                           <div className="flex items-center gap-1.5 cursor-default">
@@ -1745,33 +1635,90 @@ function PerlerBeadContent() {
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
         </div>
 
-        {/* 右侧：设置面板 */}
-        <RightPanel
-          brand={brand}
-          qualityTier={qualityTier}
-          customGridSize={customGridSize}
-          removeBg={removeBg}
-          useDithering={useDithering}
-          removeTransitionColors={removeTransitionColors}
-          transitionColorThreshold={transitionColorThreshold}
-          beadShape={beadShape}
-          showGridLines={showGridLines}
-          maxColorLimit={maxColorLimit}
-          hasGenerated={hasGenerated}
-          colorStatLength={colorStats.length}
-          onBrandChange={setBrand}
-          onQualityTierChange={setQualityTier}
-          onCustomGridSizeChange={setCustomGridSize}
-          onApplyCustomGrid={() => handleGenerateRef.current()}
-          onRemoveBgChange={() => setRemoveBg(v => !v)}
-          onDitheringChange={() => setUseDithering(v => !v)}
-          onRemoveTransitionColorsChange={() => setRemoveTransitionColors(v => !v)}
-          onTransitionColorThresholdChange={setTransitionColorThreshold}
-          onBeadShapeChange={setBeadShape}
-          onShowGridLinesChange={setShowGridLines}
-          onMaxColorLimitChange={setMaxColorLimit}
-          onApplyColorLimit={applyColorLimit}
-        />
+        {/* 右侧：设置面板 — 桌面端常驻，移动端按需显示 */}
+        {mobilePanel !== 'left' && (
+          <div className={`${mobilePanel === 'right' ? 'flex' : 'hidden'} md:flex`}>
+            <RightPanel
+              brand={brand}
+              qualityTier={qualityTier}
+              customGridSize={customGridSize}
+              removeBg={removeBg}
+              useDithering={useDithering}
+              removeTransitionColors={removeTransitionColors}
+              transitionColorThreshold={transitionColorThreshold}
+              beadShape={beadShape}
+              showGridLines={showGridLines}
+              maxColorLimit={maxColorLimit}
+              hasGenerated={hasGenerated}
+              colorStatLength={colorStats.length}
+              onClose={() => setMobilePanel('none')}
+              onBrandChange={setBrand}
+              onQualityTierChange={setQualityTier}
+              onCustomGridSizeChange={setCustomGridSize}
+              onApplyCustomGrid={() => handleGenerateRef.current()}
+              onRemoveBgChange={() => setRemoveBg(v => !v)}
+              onDitheringChange={() => setUseDithering(v => !v)}
+              onRemoveTransitionColorsChange={() => setRemoveTransitionColors(v => !v)}
+              onTransitionColorThresholdChange={setTransitionColorThreshold}
+              onBeadShapeChange={setBeadShape}
+              onShowGridLinesChange={setShowGridLines}
+              onMaxColorLimitChange={setMaxColorLimit}
+              onApplyColorLimit={applyColorLimit}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 移动端底部导航栏 — 仅在手机端显示 */}
+      <div className="flex md:hidden items-center justify-around border-t px-2 py-1 safe-area-bottom" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--card-bg)', paddingBottom: 'max(0.25rem, env(safe-area-inset-bottom))' }}>
+        <button
+          onClick={() => setMobilePanel(p => p === 'left' ? 'none' : 'left')}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg min-w-0"
+          style={{ color: mobilePanel === 'left' ? 'var(--primary)' : 'var(--text-muted)' }}
+        >
+          <Image className="w-5 h-5" />
+          <span className="text-[10px]">原图</span>
+        </button>
+        <button
+          onClick={() => { setMobilePanel('none'); setActiveTool(t => t === 'brush' ? null : 'brush'); }}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg min-w-0"
+          style={{ color: activeTool === 'brush' ? 'var(--primary)' : 'var(--text-muted)' }}
+        >
+          <Pencil className="w-5 h-5" />
+          <span className="text-[10px]">画笔</span>
+        </button>
+        <button
+          onClick={() => { setMobilePanel('none'); setActiveTool(null); }}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg min-w-0"
+          style={{ color: activeTool === null ? 'var(--primary)' : 'var(--text-muted)' }}
+        >
+          <MousePointer2 className="w-5 h-5" />
+          <span className="text-[10px]">移动</span>
+        </button>
+        <button
+          onClick={() => { setMobilePanel('none'); setZoomLevel(z => Math.max(1, z - 0.5)); }}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg min-w-0"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ZoomOut className="w-5 h-5" />
+          <span className="text-[10px]">缩小</span>
+        </button>
+        <button
+          onClick={() => { setMobilePanel('none'); setZoomLevel(z => Math.min(5, z + 0.5)); }}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg min-w-0"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ZoomIn className="w-5 h-5" />
+          <span className="text-[10px]">放大</span>
+        </button>
+        <button
+          onClick={() => setMobilePanel(p => p === 'right' ? 'none' : 'right')}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg min-w-0"
+          style={{ color: mobilePanel === 'right' ? 'var(--primary)' : 'var(--text-muted)' }}
+        >
+          <Settings className="w-5 h-5" />
+          <span className="text-[10px]">设置</span>
+        </button>
       </div>
     </div>
   );

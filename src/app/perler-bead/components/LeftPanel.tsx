@@ -1,10 +1,6 @@
 'use client';
 
-interface LeftPanelProps {
-  imageUrl: string | null;
-  colorStats: ColorStat[];
-  totalBeads: number;
-}
+import { ImageIcon, Info, X } from 'lucide-react';
 
 interface ColorStat {
   code: string;
@@ -14,7 +10,12 @@ interface ColorStat {
   percentage: number;
 }
 
-import { ImageIcon, Info } from 'lucide-react';
+interface LeftPanelProps {
+  imageUrl: string | null;
+  colorStats: ColorStat[];
+  totalBeads: number;
+  onClose?: () => void;
+}
 
 function textColor(hex: string): string {
   const rr = parseInt(hex.slice(1, 3), 16);
@@ -23,9 +24,18 @@ function textColor(hex: string): string {
   return (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255 > 0.5 ? '#333' : '#fff';
 }
 
-export default function LeftPanel({ imageUrl, colorStats, totalBeads }: LeftPanelProps) {
+export default function LeftPanel({ imageUrl, colorStats, totalBeads, onClose }: LeftPanelProps) {
   return (
-    <div className="w-72 flex-shrink-0 overflow-y-auto border-r flex flex-col" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
+    <div className="w-72 flex-shrink-0 overflow-y-auto border-r flex flex-col md:flex-col" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
+      {/* 移动端关闭按钮 */}
+      {onClose && (
+        <div className="flex items-center justify-between p-3 border-b md:hidden" style={{ borderColor: 'var(--border-color)' }}>
+          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>原图 & 色卡</span>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5" style={{ color: 'var(--text-secondary)' }} />
+          </button>
+        </div>
+      )}
       {/* 原图预览 */}
       {imageUrl && (
         <div className="p-4 pb-2">
