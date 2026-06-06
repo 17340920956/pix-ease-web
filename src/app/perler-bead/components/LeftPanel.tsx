@@ -1,6 +1,7 @@
 'use client';
 
 import { ImageIcon, Info, X } from 'lucide-react';
+import { textColor } from '@/lib/colorUtils';
 
 interface ColorStat {
   code: string;
@@ -15,13 +16,6 @@ interface LeftPanelProps {
   colorStats: ColorStat[];
   totalBeads: number;
   onClose?: () => void;
-}
-
-function textColor(hex: string): string {
-  const rr = parseInt(hex.slice(1, 3), 16);
-  const gg = parseInt(hex.slice(3, 5), 16);
-  const bb = parseInt(hex.slice(5, 7), 16);
-  return (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255 > 0.5 ? '#333' : '#fff';
 }
 
 export default function LeftPanel({ imageUrl, colorStats, totalBeads, onClose }: LeftPanelProps) {

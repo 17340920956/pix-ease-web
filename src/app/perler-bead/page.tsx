@@ -5,20 +5,15 @@ import {
   Pipette, Pencil, ZoomIn, ZoomOut, RotateCcw, Undo2, Redo2,
   AlignVerticalJustifyCenter, AlignHorizontalJustifyCenter, Grid3X3,
   LayoutGrid, Eye, EyeOff, PaintBucket, Eraser, MousePointer2,
-  Palette, Image, Settings,
+  Image, Settings,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthGuard from '@/components/AuthGuard';
 import TopHeader from '@/components/TopHeader';
 import Tooltip from '@/components/Tooltip';
 import { brandPalettes, defaultBrand } from '@/lib/colorData';
-import { removeImageBackground, initBackgroundRemoval } from '@/lib/backgroundRemoval';
-import { superpixelMatch } from '@/lib/bead/superpixelMatch';
-import { pixelateWithMask, type PixelateMode } from '@/lib/bead/pixelate';
-import { analyzeImageComplexity, type ImageAnalysis } from '@/lib/bead/analyze';
-import { bilateralFilter } from '@/lib/bead/bilateralFilter';
-import { postprocessBeadMap } from '@/lib/bead/postprocess';
-import { autoEnhancePhoto, enhanceSaturation } from '@/lib/bead/enhance';
+import { initBackgroundRemoval } from '@/lib/backgroundRemoval';
+import { runPipeline } from '@/lib/bead/pipeline';
 import { buildHexMap, clearColorCache, parseHexColor } from '@/lib/bead/colorMatch';
 import type { BeadColor, BeadShape, QualityTier } from '@/lib/bead/types';
 
@@ -155,18 +150,21 @@ function PerlerBeadContent() {
     bh: number;
   } | null>(null);
   const beadMapRef = useRef<Map<string, string>>(new Map());
+  const originalBeadMapRef = useRef<Map<string, string> | null>(null);
   const brushRafRef = useRef<number>(0);
+  const imageUrlRef = useRef<string | null>(null);
   const panStartRef = useRef({ x: 0, y: 0 });
   const handleGenerateRef = useRef<() => void>(() => {});
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   // --- State ---
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // 保持 ref 与 state 同步，避免 useCallback 闭包问题
+  useEffect(() => { imageUrlRef.current = imageUrl; }, [imageUrl]);
   const [brand, setBrand] = useState(defaultBrand);
   const [qualityTier, setQualityTier] = useState<QualityTier>('standard');
   const [customGridSize, setCustomGridSize] = useState<number | ''>('');
   const [removeBg, setRemoveBg] = useState(false);
-  const [useDithering, setUseDithering] = useState(false);
-  const [removeTransitionColors, setRemoveTransitionColors] = useState(false);
   const [transitionColorThreshold, setTransitionColorThreshold] = useState<number | ''>(3);
   const [beadShape, setBeadShape] = useState<BeadShape>('square');
   const [isUploading, setIsUploading] = useState(false);
@@ -190,8 +188,7 @@ function PerlerBeadContent() {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [maxColorLimit, setMaxColorLimit] = useState<number | ''>('');
-  const [history, setHistory] = useState<Map<string, string>[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [historyState, setHistoryState] = useState<{ entries: Map<string, string>[]; index: number }>({ entries: [], index: -1 });
 
   // --- 对称模式 ---
   const [symmetryMode, setSymmetryMode] = useState<'none' | 'horizontal' | 'vertical' | 'four-way'>('none');
@@ -277,7 +274,7 @@ function PerlerBeadContent() {
     try {
       const url = URL.createObjectURL(file);
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const image = new Image();
+        const image = document.createElement("img");
         image.onload = () => resolve(image);
         image.onerror = () => reject(new Error('图片加载失败'));
         image.src = url;
@@ -302,209 +299,38 @@ function PerlerBeadContent() {
     if (!imageUrl) return;
 
     setIsProcessing(true);
-    setError(null);
-    setHasGenerated(false);
-    setColorStats([]);
-    setTotalBeads(0);
+    setError(null); setHasGenerated(false); setColorStats([]); setTotalBeads(0);
 
     try {
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error('图片加载失败'));
-        image.src = imageUrl;
+      const threshold = transitionColorThreshold === '' ? 3 : Math.max(1, transitionColorThreshold);
+      const result = await runPipeline({
+        imageUrl,
+        maxDim,
+        removeBg,
+        palette: palette.colors,
+        transitionThreshold: threshold,
+        onStatus: setStatusText,
       });
 
-      const imgW = img.width, imgH = img.height;
-      let bw: number, bh: number;
-      if (imgW >= imgH) {
-        bw = maxDim;
-        bh = Math.max(1, Math.round(maxDim * imgH / imgW));
-      } else {
-        bh = maxDim;
-        bw = Math.max(1, Math.round(maxDim * imgW / imgH));
-      }
-
-      // ========================================================
-      // 图像处理管线 v7 - 专业优化版
-      //
-      // 核心思想：根据图片类型自适应处理策略
-      //
-      //   1. AI 全分辨率抠图 → 得到全分辨率 alpha 掩码
-      //   2. 图片类型分析 → 自动检测简单图/照片
-      //   3. 照片预处理 → 边缘保留双边滤波
-      //   4. 智能降采样 → 根据类型选择采样策略
-      //   5. CIEDE2000 颜色匹配
-      //   6. 后处理 → 孤立像素平滑 + 轮廓保护
-      // ========================================================
-
-      setStatusText('分析图片...');
-
-      // Clear color cache before each generation to avoid stale results
-      clearColorCache();
-
-      // 1. 准备全分辨率 alpha 掩码
-      let fullMask: Uint8Array | null = null;
-
-      if (removeBg) {
-        try {
-          setStatusText('AI 抠图中...');
-          const aiResult = await removeImageBackground(imageUrl, setStatusText);
-          if (aiResult) {
-            const aiUrl = URL.createObjectURL(aiResult);
-            const aiImg = await new Promise<HTMLImageElement>((res, rej) => {
-              const ri = new Image();
-              ri.onload = () => res(ri);
-              ri.onerror = () => rej(new Error('AI抠图结果加载失败'));
-              ri.src = aiUrl;
-            });
-            URL.revokeObjectURL(aiUrl);
-
-            // 将AI结果缩放到原图尺寸，只取alpha通道
-            const maskCanvas = document.createElement('canvas');
-            maskCanvas.width = img.width;
-            maskCanvas.height = img.height;
-            const maskCtx = maskCanvas.getContext('2d')!;
-            maskCtx.drawImage(aiImg, 0, 0, img.width, img.height);
-            const maskData = maskCtx.getImageData(0, 0, img.width, img.height);
-
-            fullMask = new Uint8Array(img.width * img.height);
-            for (let i = 0; i < img.width * img.height; i++) {
-              fullMask[i] = maskData.data[i * 4 + 3];
-            }
-          }
-        } catch {
-          setStatusText('抠图失败，使用原图');
-        }
-      }
-
-      // 2. 图片类型分析
-      const srcCanvas = document.createElement('canvas');
-      srcCanvas.width = img.width;
-      srcCanvas.height = img.height;
-      const srcCtx = srcCanvas.getContext('2d')!;
-      srcCtx.drawImage(img, 0, 0);
-      const srcImageData = srcCtx.getImageData(0, 0, img.width, img.height);
-
-      setStatusText('分析图片复杂度...');
-      const analysis: ImageAnalysis = analyzeImageComplexity(srcImageData);
-      
-      console.log('[perler] 图片分析结果:', {
-        type: analysis.isIllustration ? '插画/动漫' : analysis.isComplex ? '照片' : '简单图',
-        colorCount: analysis.colorCount,
-        edgeStrength: analysis.edgeStrength.toFixed(3),
-        dominantColors: analysis.dominantColors,
-      });
-
-      // 3. 预处理
-      let processedData = srcImageData;
-      if (analysis.isComplex) {
-        // 照片：边缘保留双边滤波
-        setStatusText('预处理照片...');
-        processedData = bilateralFilter(srcImageData, fullMask, {
-          radius: 3,
-          sigmaSpace: 3,
-          sigmaColor: 40,
-        });
-      }
-      // 插画不需要额外预处理，像素化内部会做强平滑
-
-      // 4. 照片模式自适应增强（对比度/亮度/饱和度）
-      if (analysis.isComplex) {
-        setStatusText('自适应增强...');
-        processedData = autoEnhancePhoto(processedData, fullMask);
-        processedData = enhanceSaturation(processedData, fullMask, 1.1);
-      }
-
-      // 5. 智能降采样
-      setStatusText('像素化处理...');
-      const mode: PixelateMode = analysis.isIllustration
-        ? 'illustration'
-        : analysis.isComplex
-        ? 'photo'
-        : 'simple';
-      const pixelated = pixelateWithMask(processedData, bw, bh, fullMask, { mode });
-
-      // 6. 提取 alpha 值
-      const alphaValues = new Uint8Array(bw * bh);
-      for (let i = 0; i < bw * bh; i++) {
-        alphaValues[i] = pixelated.data[i * 4 + 3];
-      }
-
-      // 7. 超像素区域匹配 — 自创算法
-      setStatusText('超像素分割中...');
-      const parsedColors = palette.colors;
-      const { beadMap: rawBeadMap, superpixelCount } = superpixelMatch(
-        pixelated,
-        bw,
-        bh,
-        alphaValues,
-        parsedColors,
-        {
-          quantizeLevels: 32, // 较低量化等级，保留更多颜色细节
-          minRegionSize: 1,
-        }
-      );
-
-      // 8. 轻量后处理：孤立像素平滑 + 过渡色去除
-      setStatusText('优化图纸...');
-      
-      let beadMap = postprocessBeadMap(rawBeadMap, parsedColors, bw, bh, {
-        smoothIsolated: true,
-        strengthenEdges: false,
-        removeTransition: true,
-        transitionThreshold: transitionColorThreshold === '' ? 3 : Math.max(1, transitionColorThreshold),
-        maxColors: 0,
-        mergeSimilarNeighborhood: true,
-        mergeColorThreshold: 12,
-      });
-
-      // 重新统计颜色
-      const countMap = new Map<string, number>();
-      beadMap.forEach(hex => {
-        countMap.set(hex, (countMap.get(hex) || 0) + 1);
-      });
-
-      setBeadW(bw);
-      setBeadH(bh);
-
-      const stats: ColorStat[] = [];
-      countMap.forEach((count, hex) => {
-        if (count <= 0) return;
-        const upperHex = hex.toUpperCase();
-        const colorMap = buildHexMap(parsedColors);
-        const c = colorMap.get(upperHex);
-        if (c) {
-          stats.push({ code: c.code, name: c.name, hex: c.hex, count, percentage: 0 });
-        }
-      });
-      stats.sort((a, b) => a.code.localeCompare(b.code));
-      const total = stats.reduce((s, c) => s + c.count, 0);
-      stats.forEach((s) => (s.percentage = total > 0 ? (s.count / total) * 100 : 0));
-
-      setTotalBeads(total);
-      setColorStats(stats);
+      setBeadW(result.bw); setBeadH(result.bh);
+      setTotalBeads(result.totalBeads);
+      setColorStats(result.stats);
 
       exportDataRef.current = {
-        beadMap,
-        paletteColors: parsedColors,
-        bw,
-        bh,
+        beadMap: result.beadMap,
+        paletteColors: result.paletteColors,
+        bw: result.bw, bh: result.bh,
       };
-      beadMapRef.current = beadMap;
+      beadMapRef.current = result.beadMap;
+      originalBeadMapRef.current = new Map(result.beadMap);
 
-      setStatusText(`生成完成 · ${total} 颗豆 · ${stats.length} 种颜色`);
-      setHasGenerated(true);
-      setRenderVersion(v => v + 1);
-
-      setHistory([new Map(beadMap)]);
-      setHistoryIndex(0);
+      setStatusText(`生成完成 · ${result.totalBeads} 颗豆 · ${result.stats.length} 种颜色`);
+      setHasGenerated(true); setRenderVersion(v => v + 1);
+      setHistoryState({ entries: [new Map(result.beadMap)], index: 0 });
     } catch (err: any) {
       console.error('[perler] generate error:', err);
       setError(err?.message || String(err) || '生成失败，请重试');
-    } finally {
-      setIsProcessing(false);
-    }
+    } finally { setIsProcessing(false); }
   }, [imageUrl, maxDim, removeBg, transitionColorThreshold, palette]);
 
   // 始终保持最新回调引用
@@ -515,7 +341,7 @@ function PerlerBeadContent() {
     if (imageUrl) {
       handleGenerateRef.current();
     }
-  }, [imageUrl, removeBg, useDithering, removeTransitionColors, transitionColorThreshold, brand, qualityTier]);
+  }, [imageUrl, removeBg, transitionColorThreshold, brand, qualityTier]);
 
   // ========================================================
   // 颜色统计更新（画笔操作后）
@@ -540,36 +366,39 @@ function PerlerBeadContent() {
 
   const pushHistory = useCallback((bm: Map<string, string>) => {
     const snapshot = new Map(bm);
-    setHistory(prev => {
-      const newHistory = prev.slice(0, historyIndex + 1);
-      newHistory.push(snapshot);
-      if (newHistory.length > 50) newHistory.shift();
-      return newHistory;
+    setHistoryState(prev => {
+      const entries = prev.entries.slice(0, prev.index + 1);
+      entries.push(snapshot);
+      if (entries.length > 50) entries.shift();
+      return { entries, index: entries.length - 1 };
     });
-    setHistoryIndex(prev => Math.min(prev + 1, 49));
-  }, [historyIndex]);
+  }, []);
 
   const handleUndo = useCallback(() => {
-    if (historyIndex <= 0) return;
-    const prevIndex = historyIndex - 1;
-    const prevBm = new Map(history[prevIndex]);
-    beadMapRef.current = prevBm;
-    exportDataRef.current = exportDataRef.current ? { ...exportDataRef.current, beadMap: prevBm } : null;
-    updateColorStats(prevBm);
-    setHistoryIndex(prevIndex);
-    setRenderVersion(v => v + 1);
-  }, [history, historyIndex, updateColorStats]);
+    setHistoryState(prev => {
+      if (prev.index <= 0) return prev;
+      const newIndex = prev.index - 1;
+      const prevBm = new Map(prev.entries[newIndex]);
+      beadMapRef.current = prevBm;
+      exportDataRef.current = exportDataRef.current ? { ...exportDataRef.current, beadMap: prevBm } : null;
+      updateColorStats(prevBm);
+      setRenderVersion(v => v + 1);
+      return { ...prev, index: newIndex };
+    });
+  }, [updateColorStats]);
 
   const handleRedo = useCallback(() => {
-    if (historyIndex >= history.length - 1) return;
-    const nextIndex = historyIndex + 1;
-    const nextBm = new Map(history[nextIndex]);
-    beadMapRef.current = nextBm;
-    exportDataRef.current = exportDataRef.current ? { ...exportDataRef.current, beadMap: nextBm } : null;
-    updateColorStats(nextBm);
-    setHistoryIndex(nextIndex);
-    setRenderVersion(v => v + 1);
-  }, [history, historyIndex, updateColorStats]);
+    setHistoryState(prev => {
+      if (prev.index >= prev.entries.length - 1) return prev;
+      const newIndex = prev.index + 1;
+      const nextBm = new Map(prev.entries[newIndex]);
+      beadMapRef.current = nextBm;
+      exportDataRef.current = exportDataRef.current ? { ...exportDataRef.current, beadMap: nextBm } : null;
+      updateColorStats(nextBm);
+      setRenderVersion(v => v + 1);
+      return { ...prev, index: newIndex };
+    });
+  }, [updateColorStats]);
 
   const applyBrushChange = useCallback((bm: Map<string, string>) => {
     pushHistory(bm);
@@ -627,7 +456,7 @@ function PerlerBeadContent() {
   // ========================================================
 
   const handleReset = useCallback(() => {
-    if (imageUrl) URL.revokeObjectURL(imageUrl);
+    if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current);
     setImageUrl(null);
     setHasGenerated(false);
     setError(null);
@@ -648,12 +477,11 @@ function PerlerBeadContent() {
     setCustomGridSize('');
     beadMapRef.current = new Map();
     exportDataRef.current = null;
-    setHistory([]);
-    setHistoryIndex(-1);
+    setHistoryState({ entries: [], index: -1 });
     setBrushCode('');
     setSymmetryMode('none');
     setShowCenterLines(false);
-  }, [imageUrl]);
+  }, []);
 
   // ========================================================
   // 预览渲染
@@ -662,15 +490,15 @@ function PerlerBeadContent() {
   useEffect(() => {
     const data = exportDataRef.current;
     if (!data || !previewCanvasRef.current) return;
-    renderPreview(data.bw, data.bh, beadMapRef.current, data.paletteColors, beadShape);
+    renderPreview(data.bw, data.bh, beadMapRef.current, data.paletteColors, beadShape, zoomLevel, panOffset);
   }, [beadShape, renderVersion, zoomLevel, panOffset, showCenterLines, showGridLines]);
 
   const renderPreview = useCallback(
-    (w: number, h: number, beadMap: Map<string, string>, _colors: BeadColor[], shape: BeadShape) => {
+    (w: number, h: number, beadMap: Map<string, string>, _colors: BeadColor[], shape: BeadShape, zoom: number, pan: { x: number; y: number }) => {
       const canvas = previewCanvasRef.current;
       if (!canvas) return;
 
-      const cellSize = Math.max(4, Math.min(24, Math.floor(700 / Math.max(w, h))) * zoomLevel);
+      const cellSize = Math.max(4, Math.min(24, Math.floor(700 / Math.max(w, h))) * zoom);
       const margin = cellSize >= 12 ? 24 : 22;
       const labelMargin = margin; // 左侧和底部留白宽度保持一致
       const totalW = w * cellSize + margin * 2;
@@ -681,7 +509,7 @@ function PerlerBeadContent() {
       const ctx = canvas.getContext('2d')!;
 
       ctx.save();
-      ctx.translate(panOffset.x, panOffset.y);
+      ctx.translate(pan.x, pan.y);
 
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, totalW, canvasH);
@@ -819,7 +647,7 @@ function PerlerBeadContent() {
 
       ctx.restore();
     },
-    [zoomLevel, panOffset, showCenterLines, showGridLines],
+    [showCenterLines, showGridLines],
   );
 
   // ========================================================
@@ -863,9 +691,9 @@ function PerlerBeadContent() {
     if (!canvas || !data) return null;
     const rect = canvas.getBoundingClientRect();
     const cs = cellSizeForZoom();
-    const margin = cs >= 12 ? 24 : 8;
-    const bx = Math.floor((cx - rect.left - margin - panOffset.x) / cs);
-    const by = Math.floor((cy - rect.top - margin - panOffset.y) / cs);
+    const margin = cs >= 12 ? 24 : 22; // 与 renderPreview 保持一致
+    const bx = Math.floor((cx - rect.left - panOffset.x - margin) / cs);
+    const by = Math.floor((cy - rect.top - panOffset.y - margin) / cs);
     if (bx < 0 || bx >= data.bw || by < 0 || by >= data.bh) return null;
     return { x: bx, y: by };
   }, [cellSizeForZoom, panOffset]);
@@ -934,23 +762,24 @@ function PerlerBeadContent() {
       return;
     }
     if (!hasGenerated || (activeTool !== 'brush' && activeTool !== 'eraser') || e.buttons !== 1) return;
-    const pos = canvasToBead(e.clientX, e.clientY);
-    if (!pos) return;
+    // 节流：每帧最多处理一次
     if (brushRafRef.current) return;
+    // 捕获当前鼠标坐标，避免 RAF 回调中使用过期值
+    const cx = e.clientX, cy = e.clientY;
     brushRafRef.current = requestAnimationFrame(() => {
+      brushRafRef.current = 0;
+      const pos = canvasToBead(cx, cy);
+      if (!pos) return;
       const bm = beadMapRef.current;
       const data = exportDataRef.current;
-      if (!data) { brushRafRef.current = 0; return; }
+      if (!data) return;
       if (activeTool === 'eraser') {
         const positions = getSymmetricPositions(pos.x, pos.y, data.bw, data.bh);
-        for (const [px, py] of positions) {
-          bm.delete(`${px},${py}`);
-        }
+        for (const [px, py] of positions) bm.delete(`${px},${py}`);
       } else {
         paintAtPosition(bm, pos.x, pos.y, brushColor, data.bw, data.bh);
       }
       applyBrushChange(bm);
-      brushRafRef.current = 0;
     });
   }, [hasGenerated, activeTool, brushColor, canvasToBead, isPanning, applyBrushChange, paintAtPosition, getSymmetricPositions]);
 
@@ -959,14 +788,36 @@ function PerlerBeadContent() {
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    // 禁用滚轮缩放，使用工具栏按钮控制
     e.preventDefault();
+    setZoomLevel(z => Math.max(1, Math.min(5, z - e.deltaY * 0.005)));
   }, []);
 
   const resetView = useCallback(() => {
-    setZoomLevel(1);
-    setPanOffset({ x: 0, y: 0 });
-  }, []);
+    const z = 1;
+    const p = { x: 0, y: 0 };
+    setZoomLevel(z);
+    setPanOffset(p);
+    // 重置容器滚动位置
+    if (canvasContainerRef.current) {
+      canvasContainerRef.current.scrollTop = 0;
+      canvasContainerRef.current.scrollLeft = 0;
+    }
+    // 恢复原始图纸（撤销所有画笔/橡皮擦修改）
+    const original = originalBeadMapRef.current;
+    if (original) {
+      const restored = new Map(original);
+      beadMapRef.current = restored;
+      if (exportDataRef.current) {
+        exportDataRef.current = { ...exportDataRef.current, beadMap: restored };
+      }
+      updateColorStats(restored);
+      pushHistory(restored);
+    }
+    const data = exportDataRef.current;
+    if (data) {
+      renderPreview(data.bw, data.bh, beadMapRef.current, data.paletteColors, beadShape, z, p);
+    }
+  }, [renderPreview, beadShape, updateColorStats, pushHistory]);
 
   // ========================================================
   // 快捷键
@@ -1451,13 +1302,15 @@ function PerlerBeadContent() {
         <div className="flex-1 flex flex-col overflow-hidden p-4 md:p-6 gap-3 md:gap-4 min-w-0">
           <AnimatePresence mode="wait">
             {!imageUrl ? (
-              <UploadZone
-                isUploading={isUploading}
-                error={error}
-                onClick={uploadClick}
+              <motion.div key="upload-zone" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="flex-1 flex items-center justify-center">
+                <UploadZone
+                  isUploading={isUploading}
+                  error={error}
+                  onClick={uploadClick}
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
               />
+              </motion.div>
             ) : (
               <motion.div
                 key="preview"
@@ -1580,10 +1433,10 @@ function PerlerBeadContent() {
                       <div className="w-px h-5" style={{ backgroundColor: 'var(--border-color)' }} />
 
                       {/* 撤销/重做 */}
-                      <IconButton onClick={handleUndo} disabled={historyIndex <= 0} label="撤销 (Ctrl+Z)">
+                      <IconButton onClick={handleUndo} disabled={historyState.index <= 0} label="撤销 (Ctrl+Z)">
                         <Undo2 className="w-3.5 h-3.5" />
                       </IconButton>
-                      <IconButton onClick={handleRedo} disabled={historyIndex >= history.length - 1} label="重做 (Ctrl+Shift+Z)">
+                      <IconButton onClick={handleRedo} disabled={historyState.index >= historyState.entries.length - 1} label="重做 (Ctrl+Shift+Z)">
                         <Redo2 className="w-3.5 h-3.5" />
                       </IconButton>
 
@@ -1602,6 +1455,7 @@ function PerlerBeadContent() {
 
                     {/* 画布 */}
                     <div
+                      ref={canvasContainerRef}
                       className="flex-1 rounded-2xl p-4 flex shadow-sm overflow-auto"
                       style={{
                         backgroundColor: '#f5f5f7',
@@ -1643,8 +1497,6 @@ function PerlerBeadContent() {
               qualityTier={qualityTier}
               customGridSize={customGridSize}
               removeBg={removeBg}
-              useDithering={useDithering}
-              removeTransitionColors={removeTransitionColors}
               transitionColorThreshold={transitionColorThreshold}
               beadShape={beadShape}
               showGridLines={showGridLines}
@@ -1657,8 +1509,6 @@ function PerlerBeadContent() {
               onCustomGridSizeChange={setCustomGridSize}
               onApplyCustomGrid={() => handleGenerateRef.current()}
               onRemoveBgChange={() => setRemoveBg(v => !v)}
-              onDitheringChange={() => setUseDithering(v => !v)}
-              onRemoveTransitionColorsChange={() => setRemoveTransitionColors(v => !v)}
               onTransitionColorThresholdChange={setTransitionColorThreshold}
               onBeadShapeChange={setBeadShape}
               onShowGridLinesChange={setShowGridLines}

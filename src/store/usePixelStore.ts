@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { coordKey, generateId, toMap, hexToRgba, rgbaToHex, hslToRgb, rgbToHsl } from '@/lib/pixelUtils';
+import { coordKey, generateId, toMap, rgbaToHex, hslToRgb, rgbToHsl } from '@/lib/pixelUtils';
+import { hexToRgba } from '@/lib/colorUtils';
 import { BlendMode } from '@/types/pixel';
 
 export type PixelTool =

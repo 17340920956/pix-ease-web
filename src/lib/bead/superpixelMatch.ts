@@ -300,19 +300,21 @@ function enforceRegionConsistency(
     }
   }
 
-  // 颜色相似度检查（RGB 距离 < 20 认为是同系色）
+  // 颜色相似度检查（RGB 距离 < 18 认为是同系色，收紧阈值避免误合并）
   const isSimilarColor = (hex1: string, hex2: string): boolean => {
     const [r1, g1, b1] = parseHexColor(hex1);
     const [r2, g2, b2] = parseHexColor(hex2);
     const dist = Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
-    return dist < 20;
+    return dist < 18;
   };
 
-  // 统一小区域到相邻大区域的同系色
+  // 统一区域到同系色邻居 — 面积加权，仅合并小区域
   const updates = new Map<number, string>();
 
   for (const [regionId, hex] of regionPalette.entries()) {
     if (!hex) continue;
+    const currentSize = regionSize[regionId];
+    if (currentSize === 0) continue;
     const neighbors = regionNeighbors.get(regionId);
     if (!neighbors || neighbors.size === 0) continue;
 
@@ -326,7 +328,7 @@ function enforceRegionConsistency(
       }
     }
 
-    // 如果某个同系色邻居出现频率最高，统一为该色
+    // 找最频繁的同系色邻居
     let maxFreq = 0;
     let bestHex = hex;
     for (const [nHex, freq] of neighborColorFreq) {
@@ -336,8 +338,13 @@ function enforceRegionConsistency(
       }
     }
 
+    // 面积加权：只有小区域（≤10px）或远小于邻居（<1/3）才合并
+    // 大区域保留独立色，避免面部大块色被错误统一
+    const MAX_SMALL_SIZE = 10;
     if (bestHex !== hex && maxFreq >= 2) {
-      updates.set(regionId, bestHex);
+      if (currentSize <= MAX_SMALL_SIZE) {
+        updates.set(regionId, bestHex);
+      }
     }
   }
 

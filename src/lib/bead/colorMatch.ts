@@ -233,7 +233,7 @@ export function smartReducePalette(
     }
   });
 
-  if (activeColors.size <= 1) {
+  if (activeColors.length <= 1) {
     return { beadMap: new Map(beadMap), countMap: new Map(countMap), mergedCount: 0 };
   }
 

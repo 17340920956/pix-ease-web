@@ -5,32 +5,21 @@ export interface BeadColor {
   rgb: [number, number, number];
 }
 
-export interface BeadBrand {
-  name: string;
-  colors: BeadColor[];
-}
-
-export type BeadSize = 32 | 64 | 128;
-export type PixelSize = number;
 export type BeadShape = 'circle' | 'square';
-export type ToolType = 'pen' | 'eraser' | 'picker' | 'select';
-export type ViewMode = 'edit' | 'pattern';
 
-export interface ColorCount {
+/** 精细度等级 */
+export type QualityTier = 'standard' | 'fine' | 'ultra';
+
+export interface ColorStat {
   code: string;
   name: string;
   hex: string;
   count: number;
+  percentage: number;
 }
 
 export interface HistoryEntry {
   beads: Map<string, string>;
-}
-
-export interface ExportConfig {
-  showGrid: boolean;
-  showLabels: boolean;
-  format: 'png' | 'pdf' | 'json';
 }
 
 export interface BBox {

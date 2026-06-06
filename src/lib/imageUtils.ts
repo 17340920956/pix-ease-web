@@ -1,4 +1,5 @@
 import imageCompression from 'browser-image-compression';
+import { luminance } from '@/lib/colorUtils';
 
 /**
  * 图片工具函数
@@ -67,7 +68,7 @@ export function getFileExtension(filename: string): string {
  */
 export function readFileAsImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
+    const img = document.createElement('img');
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
@@ -327,9 +328,7 @@ export async function gameboyPixelate(
   ];
 
   for (let i = 0; i < data.length; i += 4) {
-    const gray = Math.round(
-      data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114
-    );
+    const gray = Math.round(luminance(data[i], data[i + 1], data[i + 2]));
     const colorIndex = Math.min(3, Math.floor((gray / 255) * 4));
     const color = palette[colorIndex];
     data[i] = color[0];

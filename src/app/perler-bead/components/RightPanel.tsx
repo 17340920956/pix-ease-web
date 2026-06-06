@@ -5,16 +5,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { BeadColor, BeadShape, QualityTier } from '@/lib/bead/types';
 import { brandPalettes } from '@/lib/colorData';
+import { textColor } from '@/lib/colorUtils';
 import AnimatedDropdown from '@/components/AnimatedDropdown';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
-
-function textColor(hex: string): string {
-  const rr = parseInt(hex.slice(1, 3), 16);
-  const gg = parseInt(hex.slice(3, 5), 16);
-  const bb = parseInt(hex.slice(5, 7), 16);
-  return (0.299 * rr + 0.587 * gg + 0.114 * bb) / 255 > 0.5 ? '#333' : '#fff';
-}
 
 function PaletteCollapse({ palette }: { palette: BeadColor[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -58,8 +52,6 @@ interface RightPanelProps {
   qualityTier: QualityTier;
   customGridSize: number | '';
   removeBg: boolean;
-  useDithering: boolean;
-  removeTransitionColors: boolean;
   transitionColorThreshold: number | '';
   beadShape: BeadShape;
   showGridLines: boolean;
@@ -72,8 +64,6 @@ interface RightPanelProps {
   onCustomGridSizeChange: (v: number | '') => void;
   onApplyCustomGrid: () => void;
   onRemoveBgChange: () => void;
-  onDitheringChange: () => void;
-  onRemoveTransitionColorsChange: () => void;
   onTransitionColorThresholdChange: (v: number | '') => void;
   onBeadShapeChange: (v: BeadShape) => void;
   onShowGridLinesChange: (v: boolean) => void;
@@ -82,10 +72,10 @@ interface RightPanelProps {
 }
 
 export default function RightPanel({
-  brand, qualityTier, customGridSize, removeBg, useDithering, removeTransitionColors, transitionColorThreshold, beadShape,
+  brand, qualityTier, customGridSize, removeBg, transitionColorThreshold, beadShape,
   maxColorLimit, hasGenerated, colorStatLength, showGridLines, onClose,
-  onBrandChange, onQualityTierChange, onCustomGridSizeChange, onApplyCustomGrid, onRemoveBgChange, onDitheringChange,
-  onRemoveTransitionColorsChange, onTransitionColorThresholdChange,
+  onBrandChange, onQualityTierChange, onCustomGridSizeChange, onApplyCustomGrid, onRemoveBgChange,
+  onTransitionColorThresholdChange,
   onBeadShapeChange, onShowGridLinesChange, onMaxColorLimitChange, onApplyColorLimit,
 }: RightPanelProps) {
   const paletteOptions = Object.entries(brandPalettes).map(([key, val]) => ({
@@ -231,53 +221,11 @@ export default function RightPanel({
           </motion.button>
         </div>
 
-        {/* Floyd-Steinberg 抖动 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Floyd-Steinberg 抖动</span>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>优化渐变和边缘过渡</p>
-          </div>
-          <motion.button
-            onClick={onDitheringChange}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.92 }}
-            transition={springFast}
-            className="relative w-9 h-5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: useDithering ? 'var(--primary)' : 'var(--input-border)' }}
-          >
-            <motion.span
-              className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow"
-              animate={{ left: useDithering ? 18 : 2 }}
-              transition={springFast}
-            />
-          </motion.button>
-        </div>
-
-        {/* 去除过渡色 */}
+        {/* 去除过渡色阈值 */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>去除过渡色</span>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>过滤出现次数少的孤立像素</p>
-            </div>
-            <motion.button
-              onClick={onRemoveTransitionColorsChange}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.92 }}
-              transition={springFast}
-              className="relative w-9 h-5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: removeTransitionColors ? 'var(--primary)' : 'var(--input-border)' }}
-            >
-              <motion.span
-                className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow"
-                animate={{ left: removeTransitionColors ? 18 : 2 }}
-                transition={springFast}
-              />
-            </motion.button>
-          </div>
-          {removeTransitionColors && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>孤立像素阈值：</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>过渡色阈值</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>孤立像素阈值：</span>
               <input
                 type="number" min={1} max={20} placeholder="3"
                 value={transitionColorThreshold} onChange={e => onTransitionColorThresholdChange(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
@@ -286,7 +234,6 @@ export default function RightPanel({
               />
               <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>次以下将被替换</span>
             </div>
-          )}
         </div>
 
         {/* 豆子形状 */}

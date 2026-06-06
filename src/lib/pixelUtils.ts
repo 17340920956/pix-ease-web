@@ -10,21 +10,10 @@ export function toMap(raw: unknown): Map<string, string> {
   return new Map();
 }
 
-export const hexToRgba = (hex: string): [number, number, number, number] => {
-  const clean = hex.replace('#', '');
-  const r = parseInt(clean.substring(0, 2), 16);
-  const g = parseInt(clean.substring(2, 4), 16);
-  const b = parseInt(clean.substring(4, 6), 16);
-  return [r, g, b, 255];
-};
-
 export const rgbaToHex = (r: number, g: number, b: number) => {
   const toHex = (n: number) => n.toString(16).padStart(2, '0');
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
-
-export const luminance = (r: number, g: number, b: number) =>
-  0.299 * r + 0.587 * g + 0.114 * b;
 
 export const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
   if (s === 0) return [l, l, l];

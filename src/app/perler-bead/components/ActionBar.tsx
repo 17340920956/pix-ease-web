@@ -5,7 +5,6 @@ import {
   AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import type { BeadShape } from '@/lib/bead/types';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
