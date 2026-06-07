@@ -13,8 +13,8 @@ import {
   FlipHorizontal,
   FlipVertical,
   RotateCw,
-  ArrowLeft,
-  ArrowRight,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
@@ -112,9 +112,9 @@ export default memo(function TopMenuBar({
       }}
     >
       <ToolbarButton onClick={onUndo} disabled={!canUndo} label="撤销 (Ctrl+Z)"
-        icon={<ArrowLeft className="w-4 h-4" />} />
+        icon={<Undo2 className="w-4 h-4" />} />
       <ToolbarButton onClick={onRedo} disabled={!canRedo} label="重做 (Ctrl+Shift+Z)"
-        icon={<ArrowRight className="w-4 h-4" />} />
+        icon={<Redo2 className="w-4 h-4" />} />
 
       <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-color)' }} />
 

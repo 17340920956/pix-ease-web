@@ -60,7 +60,7 @@ function PixelStudioContent() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
-  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
+  const pinchRef = useRef<{ startDist: number; startScale: number; startScrollLeft: number; startScrollTop: number; centerX: number; centerY: number } | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -81,12 +81,24 @@ function PixelStudioContent() {
       return Math.sqrt(dx * dx + dy * dy);
     };
 
+    const getTouchCenter = (touches: TouchList) => {
+      if (touches.length < 2) return { x: 0, y: 0 };
+      return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2,
+      };
+    };
+
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         e.preventDefault();
         pinchRef.current = {
           startDist: getTouchDistance(e.touches),
           startScale: store.viewport.scale,
+          startScrollLeft: el.scrollLeft,
+          startScrollTop: el.scrollTop,
+          centerX: getTouchCenter(e.touches).x,
+          centerY: getTouchCenter(e.touches).y,
         };
       }
     };
@@ -98,6 +110,10 @@ function PixelStudioContent() {
         const ratio = dist / pinchRef.current.startDist;
         const newScale = Math.max(1, Math.min(128, Math.round(pinchRef.current.startScale * ratio)));
         store.setViewport({ scale: newScale });
+
+        const center = getTouchCenter(e.touches);
+        el.scrollLeft = pinchRef.current.startScrollLeft - (center.x - pinchRef.current.centerX);
+        el.scrollTop = pinchRef.current.startScrollTop - (center.y - pinchRef.current.centerY);
       }
     };
 
@@ -414,13 +430,77 @@ function PixelStudioContent() {
         onRotateCounterClockwise={() => store.rotateCanvas('counterClockwise')}
       />
 
+      {/* 移动端工具栏（位于菜单栏下方） */}
+      {isMobile && (
+        <div
+          className="overflow-x-auto flex-shrink-0"
+          style={{
+            backgroundColor: 'var(--card-bg)',
+            borderBottom: '1px solid var(--border-color)',
+          }}
+        >
+          <div className="flex items-center gap-0.5 px-1 py-1 min-w-max">
+            {TOOLS_LIST.map((tool) => (
+              <button
+                key={tool.id}
+                onClick={() => store.setTool(tool.id)}
+                className="w-9 h-8 flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+                style={{
+                  backgroundColor: store.tool === tool.id ? 'var(--primary)' : 'transparent',
+                  color: store.tool === tool.id ? '#ffffff' : 'var(--text-secondary)',
+                }}
+              >
+                {tool.icon}
+              </button>
+            ))}
+            <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 6, 8].map((size) => (
+                <button
+                  key={size}
+                  onClick={() => store.setBrushSize(size)}
+                  className="w-7 h-7 flex items-center justify-center rounded flex-shrink-0"
+                  style={{
+                    backgroundColor: store.brushSize === size ? 'var(--primary-light)' : 'transparent',
+                  }}
+                >
+                  <div
+                    className="rounded-full"
+                    style={{
+                      width: Math.min(size * 2 + 2, 14),
+                      height: Math.min(size * 2 + 2, 14),
+                      backgroundColor: store.brushSize === size ? 'var(--primary)' : 'var(--text-secondary)',
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
+            <button
+              onClick={store.swapColors}
+              className="relative w-8 h-8 cursor-pointer flex-shrink-0"
+              title="交换颜色"
+            >
+              <div
+                className="absolute top-0 left-0 w-6 h-6 rounded"
+                style={{ backgroundColor: store.color, border: '1px solid rgba(128,128,128,0.55)' }}
+              />
+              <div
+                className="absolute bottom-0 right-0 w-6 h-6 rounded"
+                style={{ backgroundColor: store.secondaryColor, border: '1px solid rgba(128,128,128,0.55)' }}
+              />
+            </button>
+          </div>
+        </div>
+      )}
+
       <input ref={primaryColorRef} type="color" className="hidden" value={store.color} onChange={(e) => store.setColor(e.target.value)} />
       <input ref={secondaryColorRef} type="color" className="hidden" value={store.secondaryColor} onChange={(e) => store.setSecondaryColor(e.target.value)} />
       <input ref={bgColorRef} type="color" className="hidden" value={store.project.backgroundColor} onChange={(e) => store.setProjectSettings({ backgroundColor: e.target.value })} />
 
       {/* 主体：左侧工具栏 + 中间画布 + 右侧面板（桌面端） */}
-      {/* 主体：底部工具栏 + 中间画布 + 弹出面板（移动端） */}
-      <div className={`flex-1 ${isMobile ? '' : 'flex'} relative`} style={{ overflow: 'hidden' }}>
+      {/* 主体：中间画布 + 弹出面板（移动端） */}
+      <div className="flex-1 relative" style={{ overflow: 'hidden' }}>
         {/* 桌面端左侧工具栏 */}
         <div
           className={`${isMobile ? 'hidden' : 'flex'} flex-shrink-0 py-2`}
@@ -441,70 +521,6 @@ function PixelStudioContent() {
             onSwapColors={store.swapColors}
           />
         </div>
-
-        {/* 移动端底部工具栏 */}
-        {isMobile && (
-          <div
-            className="absolute left-0 right-0 bottom-0 z-20 overflow-x-auto"
-            style={{
-              backgroundColor: 'var(--card-bg)',
-              borderTop: '1px solid var(--border-color)',
-            }}
-          >
-            <div className="flex items-center gap-0.5 px-1 py-1 min-w-max">
-              {TOOLS_LIST.map((tool) => (
-                <button
-                  key={tool.id}
-                  onClick={() => store.setTool(tool.id)}
-                  className="w-9 h-8 flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
-                  style={{
-                    backgroundColor: store.tool === tool.id ? 'var(--primary)' : 'transparent',
-                    color: store.tool === tool.id ? '#ffffff' : 'var(--text-secondary)',
-                  }}
-                >
-                  {tool.icon}
-                </button>
-              ))}
-              <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 6, 8].map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => store.setBrushSize(size)}
-                    className="w-7 h-7 flex items-center justify-center rounded flex-shrink-0"
-                    style={{
-                      backgroundColor: store.brushSize === size ? 'var(--primary-light)' : 'transparent',
-                    }}
-                  >
-                    <div
-                      className="rounded-full"
-                      style={{
-                        width: Math.min(size * 2 + 2, 14),
-                        height: Math.min(size * 2 + 2, 14),
-                        backgroundColor: store.brushSize === size ? 'var(--primary)' : 'var(--text-secondary)',
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
-              <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
-              <button
-                onClick={store.swapColors}
-                className="relative w-8 h-8 cursor-pointer flex-shrink-0"
-                title="交换颜色"
-              >
-                <div
-                  className="absolute top-0 left-0 w-6 h-6 rounded"
-                  style={{ backgroundColor: store.color, border: '1px solid rgba(128,128,128,0.55)' }}
-                />
-                <div
-                  className="absolute bottom-0 right-0 w-6 h-6 rounded"
-                  style={{ backgroundColor: store.secondaryColor, border: '1px solid rgba(128,128,128,0.55)' }}
-                />
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* 移动端面板切换按钮 */}
         {isMobile && (
@@ -597,9 +613,10 @@ function PixelStudioContent() {
             top: 0,
             left: isMobile ? 0 : 48,
             right: isMobile ? 0 : 220,
-            bottom: isMobile ? 48 : 0,
+            bottom: 0,
             overflow: 'auto',
             backgroundColor: 'var(--background)',
+            overscrollBehavior: 'none',
           }}
           ref={canvasAreaRef}
         >
