@@ -14,13 +14,13 @@
 
 import type { BeadColor } from './types';
 import { removeImageBackground } from '@/lib/backgroundRemoval';
-import { analyzeImageComplexity, type ImageAnalysis } from './analyze';
+import { analyzeImageComplexity, type ImageAnalysis } from '@/lib/pixelation/analyze';
 import { bilateralFilter } from './bilateralFilter';
 import { autoEnhancePhoto, enhanceSaturation } from './enhance';
-import { pixelateWithMask, type PixelateMode } from './pixelate';
+import { pixelateWithMask, type PixelateMode } from '@/lib/pixelation/pixelate';
 import { superpixelMatch } from './superpixelMatch';
 import { postprocessBeadMap } from './postprocess';
-import { buildHexMap, clearColorCache } from './colorMatch';
+import { buildHexMap, clearColorCache } from '@/lib/pixelation/colorMatch';
 
 export interface PipelineInput {
   imageUrl: string;

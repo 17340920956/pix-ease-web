@@ -23,10 +23,11 @@ const BrandLink = () => (
 export default function TopHeader({ children }: TopHeaderProps) {
   return (
     <header
-      className="px-4 py-2 flex items-center justify-between"
+      className="px-4 py-2 flex items-center justify-between flex-shrink-0"
       style={{
         backgroundColor: 'var(--card-bg)',
         borderBottom: '1px solid var(--border-color)',
+        zIndex: 300,
       }}
     >
       <div className="flex items-center gap-2">

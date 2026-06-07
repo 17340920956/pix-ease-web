@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useMemo, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Image as ImageIcon } from 'lucide-react';
 import { usePixelStore } from '@/store/usePixelStore';
 import type { PixelChange } from '@/store/usePixelStore';
 import AuthGuard from '@/components/AuthGuard';
@@ -41,6 +41,8 @@ function PixelStudioContent() {
   const [borderSize, setBorderSize] = useState(1);
   const [showGrid, setShowGrid] = useState(false);
   const [gridColor, setGridColor] = useState('#666666');
+  const refFileRef = useRef<HTMLInputElement>(null);
+  const refImageFileRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const generateExportDataUrl = useCallback((pixelSize: number, withBorder: boolean, bSize: number, withGrid: boolean, gColor: string) => {
@@ -298,6 +300,22 @@ function PixelStudioContent() {
     [store]
   );
 
+  const handleRefImageUpload = useCallback(
+    async (file: File) => {
+      try {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string;
+          store.setReferenceImage(dataUrl);
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Reference image upload failed:', err);
+      }
+    },
+    [store]
+  );
+
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
       {/* 顶部导航 */}
@@ -316,6 +334,10 @@ function PixelStudioContent() {
         onImportImage={handleImportImage}
         onUndo={store.undo}
         onRedo={store.redo}
+        onFlipHorizontal={() => store.flipCanvas('horizontal')}
+        onFlipVertical={() => store.flipCanvas('vertical')}
+        onRotateClockwise={() => store.rotateCanvas('clockwise')}
+        onRotateCounterClockwise={() => store.rotateCanvas('counterClockwise')}
       />
 
       <input ref={primaryColorRef} type="color" className="hidden" value={store.color} onChange={(e) => store.setColor(e.target.value)} />
@@ -458,6 +480,58 @@ function PixelStudioContent() {
             />
           </div>
 
+          {/* 参考图片 */}
+          <div className="rounded-xl p-3 space-y-2" style={{ backgroundColor: 'var(--button-bg)' }}>
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>参考图片</span>
+            <input ref={refImageFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleRefImageUpload(f); e.target.value = ''; } }} />
+            <div className="flex gap-1">
+              <button
+                onClick={() => refImageFileRef.current?.click()}
+                className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded transition-colors flex items-center justify-center gap-1"
+                style={{
+                  backgroundColor: store.referenceImage ? 'var(--primary-light)' : 'var(--button-bg)',
+                  color: store.referenceImage ? 'var(--primary)' : 'var(--text-secondary)',
+                  border: '1px solid var(--input-border)',
+                }}
+              >
+                <ImageIcon className="w-3 h-3" />
+                {store.referenceImage ? '已上传' : '上传'}
+              </button>
+              {store.referenceImage && (
+                <button
+                  onClick={() => store.setReferenceImage(null)}
+                  className="px-2 py-1.5 text-[10px] font-medium rounded transition-colors"
+                  style={{
+                    backgroundColor: 'var(--button-bg)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--input-border)',
+                  }}
+                >
+                  移除
+                </button>
+              )}
+            </div>
+            {store.referenceImage && (
+              <>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>透明度</span>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    value={store.referenceOpacity}
+                    onChange={(e) => store.setReferenceOpacity(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)', width: 24 }}>
+                    {Math.round(store.referenceOpacity * 100)}%
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* 画布信息 */}
           <div className="rounded-xl p-3 space-y-2" style={{ backgroundColor: 'var(--button-bg)' }}>
             <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>画布尺寸</span>
@@ -516,7 +590,22 @@ function PixelStudioContent() {
           }}
           ref={canvasAreaRef}
         >
-          <div style={{ display: 'table', margin: '0 auto' }}>
+          <div className="relative" style={{ display: 'table', margin: '0 auto' }}>
+            {store.referenceImage && (
+              <img
+                src={store.referenceImage}
+                alt="reference"
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  width: store.project.width * store.viewport.scale,
+                  height: store.project.height * store.viewport.scale,
+                  opacity: store.referenceOpacity,
+                  imageRendering: 'pixelated',
+                  objectFit: 'contain',
+                }}
+                draggable={false}
+              />
+            )}
             <PixelCanvas
               width={store.project.width}
               height={store.project.height}
@@ -532,6 +621,8 @@ function PixelStudioContent() {
               brushSize={store.brushSize}
               onStartDrawing={handleStartDrawing}
               onEndDrawing={handleEndDrawing}
+              selection={store.selection}
+              onSetSelection={store.setSelection}
             />
           </div>
         </div>

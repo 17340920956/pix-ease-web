@@ -2,11 +2,11 @@
 
 import { memo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Pencil, Eraser, PaintBucket, Pipette, Move, Square, Circle, Minus, Hand, SprayCan, ArrowUpDown } from 'lucide-react';
+import { Pencil, Eraser, PaintBucket, Pipette, Move, Square, Circle, Minus, Hand, SprayCan, ArrowUpDown, MousePointer2 } from 'lucide-react';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
 
-export type PixelTool = 'brush' | 'eraser' | 'bucket' | 'picker' | 'line' | 'rect' | 'ellipse' | 'move' | 'hand' | 'spray';
+export type PixelTool = 'brush' | 'eraser' | 'bucket' | 'picker' | 'select' | 'line' | 'rect' | 'ellipse' | 'move' | 'hand' | 'spray';
 
 interface ToolConfig {
   id: PixelTool;
@@ -20,6 +20,7 @@ const TOOLS: ToolConfig[] = [
   { id: 'eraser', icon: <Eraser className="w-4 h-4" />, label: '橡皮', shortcut: 'E' },
   { id: 'bucket', icon: <PaintBucket className="w-4 h-4" />, label: '填充', shortcut: 'G' },
   { id: 'picker', icon: <Pipette className="w-4 h-4" />, label: '取色', shortcut: 'I' },
+  { id: 'select', icon: <MousePointer2 className="w-4 h-4" />, label: '选区', shortcut: 'V' },
   { id: 'line', icon: <Minus className="w-4 h-4" />, label: '直线', shortcut: 'L' },
   { id: 'rect', icon: <Square className="w-4 h-4" />, label: '矩形', shortcut: 'R' },
   { id: 'ellipse', icon: <Circle className="w-4 h-4" />, label: '椭圆', shortcut: 'O' },

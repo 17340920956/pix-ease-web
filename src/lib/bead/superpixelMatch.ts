@@ -14,7 +14,7 @@
  */
 
 import type { BeadColor } from '@/lib/bead/types';
-import { nearestColor, parseHexColor } from '@/lib/bead/colorMatch';
+import { nearestColor, parseHexColor } from '@/lib/pixelation/colorMatch';
 
 export interface SuperpixelMatchOptions {
   /** 颜色预量化等级数（默认 32） */

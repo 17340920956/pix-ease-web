@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback, memo } from 'react';
+import { floodFill } from '@/lib/algorithms/floodFill';
 
 interface PixelCanvasProps {
   width: number;
@@ -18,31 +19,11 @@ interface PixelCanvasProps {
   brushSize: number;
   onStartDrawing: () => void;
   onEndDrawing: () => void;
+  selection?: { x: number; y: number; width: number; height: number } | null;
+  onSetSelection?: (selection: { x: number; y: number; width: number; height: number } | null) => void;
 }
 
 const DEFAULT_GRID_COLOR = 'rgba(160, 160, 160, 0.3)';
-
-function floodFillCoords(
-  startX: number, startY: number,
-  pixels: Map<string, string>, width: number, height: number
-): [number, number][] {
-  const result: [number, number][] = [];
-  const visited = new Set<string>();
-  const stack: [number, number][] = [[startX, startY]];
-  const actualTarget = pixels.get(`${startX},${startY}`) || null;
-
-  while (stack.length > 0) {
-    const [x, y] = stack.pop()!;
-    const key = `${x},${y}`;
-    if (visited.has(key)) continue;
-    if (x < 0 || x >= width || y < 0 || y >= height) continue;
-    if ((pixels.get(key) || null) !== actualTarget) continue;
-    visited.add(key);
-    result.push([x, y]);
-    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
-  }
-  return result;
-}
 
 function bresenhamLine(x0: number, y0: number, x1: number, y1: number): [number, number][] {
   const points: [number, number][] = [];
@@ -109,6 +90,8 @@ export default memo(function PixelCanvas({
   brushSize,
   onStartDrawing,
   onEndDrawing,
+  selection,
+  onSetSelection,
 }: PixelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -116,6 +99,7 @@ export default memo(function PixelCanvas({
   const lastKeyRef = useRef<string | null>(null);
   const sprayTimerRef = useRef<number>(0);
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const shapeEndRef = useRef<{ x: number; y: number } | null>(null);
   const touchIdRef = useRef<number | null>(null);
 
   const canvasWidth = width * pixelSize;
@@ -223,8 +207,12 @@ export default memo(function PixelCanvas({
 
   const startDraw = useCallback((coords: { x: number; y: number }) => {
     if (tool === 'bucket') {
-      const pts = floodFillCoords(coords.x, coords.y, pixels, width, height);
-      pts.forEach(([px, py]) => onPixelDraw(px, py, activeColor));
+      floodFill(coords.x, coords.y, activeColor, width, height, {
+        getColor: (x, y) => pixels.get(`${x},${y}`) ?? null,
+        setPixel: (x, y, color) => {
+          onPixelDraw(x, y, color);
+        },
+      });
       return false;
     }
     if (tool === 'picker') {
@@ -233,6 +221,12 @@ export default memo(function PixelCanvas({
       return false;
     }
     if (tool === 'hand') return false;
+
+    if (tool === 'select') {
+      isDrawingRef.current = true;
+      shapeStartRef.current = coords;
+      return true;
+    }
 
     isDrawingRef.current = true;
     onStartDrawing();
@@ -252,6 +246,24 @@ export default memo(function PixelCanvas({
 
   const moveDraw = useCallback((coords: { x: number; y: number }) => {
     if (!isDrawingRef.current) return;
+    if (tool === 'select' && shapeStartRef.current) {
+      shapeEndRef.current = coords;
+      const pv = previewRef.current;
+      if (!pv) return;
+      const ctx = pv.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      const start = shapeStartRef.current;
+      const x = Math.min(start.x, coords.x);
+      const y = Math.min(start.y, coords.y);
+      const w = Math.abs(coords.x - start.x) + 1;
+      const h = Math.abs(coords.y - start.y) + 1;
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(x * pixelSize + 0.5, y * pixelSize + 0.5, w * pixelSize, h * pixelSize);
+      ctx.setLineDash([]);
+    }
     if (tool === 'hand') return;
     if ((tool === 'line' || tool === 'rect' || tool === 'ellipse') && shapeStartRef.current) {
       drawPreviewShape(shapeStartRef.current, coords);
@@ -260,9 +272,25 @@ export default memo(function PixelCanvas({
     } else {
       drawBrush(coords.x, coords.y);
     }
-  }, [tool, drawBrush, drawSpray, drawPreviewShape]);
+  }, [tool, drawBrush, drawSpray, drawPreviewShape, pixelSize, canvasWidth, canvasHeight]);
 
   const endDraw = useCallback(() => {
+    if (tool === 'select' && shapeStartRef.current && isDrawingRef.current) {
+      clearPreview();
+      const start = shapeStartRef.current;
+      const end = shapeEndRef.current || start;
+      const x = Math.min(start.x, end.x);
+      const y = Math.min(start.y, end.y);
+      const w = Math.abs(end.x - start.x) + 1;
+      const h = Math.abs(end.y - start.y) + 1;
+      if (w > 0 && h > 0) {
+        onSetSelection?.({ x, y, width: w, height: h });
+      }
+      shapeStartRef.current = null;
+      shapeEndRef.current = null;
+      isDrawingRef.current = false;
+      return;
+    }
     if ((tool === 'line' || tool === 'rect' || tool === 'ellipse') && shapeStartRef.current && isDrawingRef.current) {
       const pv = previewRef.current;
       if (pv) {
@@ -284,17 +312,24 @@ export default memo(function PixelCanvas({
     }
     if (sprayTimerRef.current) { clearInterval(sprayTimerRef.current); sprayTimerRef.current = 0; }
     if (isDrawingRef.current) { isDrawingRef.current = false; onEndDrawing(); lastKeyRef.current = null; }
-  }, [tool, activeColor, onPixelDraw, onEndDrawing, clearPreview, pixelSize, canvasWidth, height]);
+  }, [tool, activeColor, onPixelDraw, onEndDrawing, clearPreview, pixelSize, canvasWidth, height, onSetSelection]);
 
   useEffect(() => {
     const handleGlobalUp = () => {
       if (sprayTimerRef.current) { clearInterval(sprayTimerRef.current); sprayTimerRef.current = 0; }
-      if (isDrawingRef.current) { isDrawingRef.current = false; onEndDrawing(); clearPreview(); shapeStartRef.current = null; }
+      if (isDrawingRef.current) { isDrawingRef.current = false; onEndDrawing(); clearPreview(); shapeStartRef.current = null; shapeEndRef.current = null; }
     };
     window.addEventListener('mouseup', handleGlobalUp);
     window.addEventListener('touchend', handleGlobalUp);
     return () => { window.removeEventListener('mouseup', handleGlobalUp); window.removeEventListener('touchend', handleGlobalUp); };
   }, [onEndDrawing, clearPreview]);
+
+  useEffect(() => {
+    if (tool !== 'select') {
+      shapeStartRef.current = null;
+      shapeEndRef.current = null;
+    }
+  }, [tool]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
@@ -352,8 +387,21 @@ export default memo(function PixelCanvas({
   const cursorMap: Record<string, string> = {
     bucket: 'crosshair', picker: 'crosshair', spray: 'crosshair',
     eraser: 'crosshair', line: 'crosshair', rect: 'crosshair',
-    ellipse: 'crosshair', hand: 'grab', move: 'move',
+    ellipse: 'crosshair', hand: 'grab', move: 'move', select: 'crosshair',
   };
+
+  const selectionOverlayStyle: React.CSSProperties | undefined = selection
+    ? {
+        position: 'absolute',
+        left: selection.x * pixelSize,
+        top: selection.y * pixelSize,
+        width: selection.width * pixelSize,
+        height: selection.height * pixelSize,
+        pointerEvents: 'none',
+        border: '2px dashed #3b82f6',
+        boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.3) inset',
+      }
+    : undefined;
 
   return (
     <div
@@ -394,6 +442,8 @@ export default memo(function PixelCanvas({
       />
 
       <div style={gridStyle} aria-hidden="true" />
+
+      {selectionOverlayStyle && <div style={selectionOverlayStyle} aria-hidden="true" />}
     </div>
   );
 });

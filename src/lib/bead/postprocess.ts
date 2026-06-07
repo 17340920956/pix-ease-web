@@ -7,7 +7,7 @@
  */
 
 import type { BeadColor } from '@/lib/bead/types';
-import { rgbToLab, ciede2000, parseHexColor } from '@/lib/bead/colorMatch';
+import { rgbToLab, ciede2000, parseHexColor } from '@/lib/pixelation/colorMatch';
 
 export interface PostprocessOptions {
   smoothIsolated?: boolean;

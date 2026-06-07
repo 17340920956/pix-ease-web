@@ -10,6 +10,10 @@ import {
   ZoomOut,
   RotateCcw,
   Trash2,
+  FlipHorizontal,
+  FlipVertical,
+  RotateCw,
+  RotateCcw as RotateCcwIcon,
 } from 'lucide-react';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
@@ -26,6 +30,10 @@ interface TopMenuBarProps {
   onImportImage: (file: File) => void;
   onUndo: () => void;
   onRedo: () => void;
+  onFlipHorizontal: () => void;
+  onFlipVertical: () => void;
+  onRotateClockwise: () => void;
+  onRotateCounterClockwise: () => void;
 }
 
 function ToolbarButton({
@@ -86,15 +94,20 @@ export default memo(function TopMenuBar({
   onImportImage,
   onUndo,
   onRedo,
+  onFlipHorizontal,
+  onFlipVertical,
+  onRotateClockwise,
+  onRotateCounterClockwise,
 }: TopMenuBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div
-      className="flex items-center gap-0.5 px-2 py-1"
+      className="flex items-center gap-0.5 px-2 py-1 flex-shrink-0"
       style={{
         backgroundColor: 'var(--card-bg)',
         borderBottom: '1px solid var(--border-color)',
+        zIndex: 0,
       }}
     >
       <ToolbarButton onClick={onUndo} disabled={!canUndo} label="撤销 (Ctrl+Z)"
@@ -117,6 +130,17 @@ export default memo(function TopMenuBar({
         icon={<Upload className="w-4 h-4" />} />
       <ToolbarButton onClick={onExportPng} label="导出 PNG"
         icon={<Download className="w-4 h-4" />} />
+
+      <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-color)' }} />
+
+      <ToolbarButton onClick={onFlipHorizontal} label="水平翻转"
+        icon={<FlipHorizontal className="w-4 h-4" />} />
+      <ToolbarButton onClick={onFlipVertical} label="垂直翻转"
+        icon={<FlipVertical className="w-4 h-4" />} />
+      <ToolbarButton onClick={onRotateClockwise} label="顺时针旋转90°"
+        icon={<RotateCw className="w-4 h-4" />} />
+      <ToolbarButton onClick={onRotateCounterClockwise} label="逆时针旋转90°"
+        icon={<RotateCcwIcon className="w-4 h-4" />} />
 
       <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-color)' }} />
 

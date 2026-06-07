@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { coordKey, generateId, toMap, rgbaToHex, hslToRgb, rgbToHsl } from '@/lib/pixelUtils';
 import { hexToRgba } from '@/lib/colorUtils';
+import { floodFill } from '@/lib/algorithms/floodFill';
 import { BlendMode } from '@/types/pixel';
 
 export type PixelTool =
@@ -390,6 +391,9 @@ interface PixelState {
   resizeCanvas: (width: number, height: number, anchor: string) => void;
   cropToSelection: () => void;
 
+  flipCanvas: (direction: 'horizontal' | 'vertical') => void;
+  rotateCanvas: (direction: 'clockwise' | 'counterClockwise') => void;
+
   shortcuts: ShortcutMap;
   setShortcut: (key: string, action: string) => void;
   resetShortcuts: () => void;
@@ -728,7 +732,7 @@ export const usePixelStore = create<PixelState>()(
       },
 
       fillArea: (startX, startY, fillColor) => {
-        const { layers, activeLayerId, undoStack } = get();
+        const { layers, activeLayerId, undoStack, project } = get();
         const layer = layers.find((l) => l.id === activeLayerId);
         if (!layer || layer.locked) return;
 
@@ -738,21 +742,14 @@ export const usePixelStore = create<PixelState>()(
 
         const newPixels = new Map(pixels);
         const changes: PixelChange[] = [];
-        const visited = new Set<string>();
-        const stack: [number, number][] = [[startX, startY]];
-        const MAX_FILL = 65536;
 
-        while (stack.length > 0 && changes.length < MAX_FILL) {
-          const [x, y] = stack.pop()!;
-          const key = coordKey(x, y);
-          if (visited.has(key)) continue;
-          visited.add(key);
-          const currentColor = pixels.get(key) || null;
-          if (currentColor !== targetColor) continue;
-          changes.push({ x, y, before: currentColor, after: fillColor });
-          newPixels.set(key, fillColor);
-          stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
-        }
+        floodFill(startX, startY, fillColor, project.width, project.height, {
+          getColor: (x, y) => pixels.get(coordKey(x, y)) ?? null,
+          setPixel: (x, y, color) => {
+            changes.push({ x, y, before: pixels.get(coordKey(x, y)) ?? null, after: color });
+            newPixels.set(coordKey(x, y), color);
+          },
+        });
 
         if (changes.length > 0) {
           const newLayers = layers.map((l) => (l.id === activeLayerId ? { ...l, pixels: newPixels } : l));
@@ -1121,6 +1118,48 @@ export const usePixelStore = create<PixelState>()(
         const { selection, project } = get();
         if (!selection) return;
         set({ project: { ...project, width: selection.width, height: selection.height }, selection: null });
+      },
+
+      flipCanvas: (direction) => {
+        const { layers, project, undoStack, activeLayerId } = get();
+        const { width, height } = project;
+        const newLayers = layers.map((layer) => {
+          if (layer.locked || !layer.visible) return layer;
+          const oldPixels = toMap(layer.pixels);
+          const newPixels = new Map<string, string>();
+          oldPixels.forEach((color, key) => {
+            const [x, y] = key.split(',').map(Number);
+            const nx = direction === 'horizontal' ? width - 1 - x : x;
+            const ny = direction === 'vertical' ? height - 1 - y : y;
+            newPixels.set(`${nx},${ny}`, color);
+          });
+          return { ...layer, pixels: newPixels };
+        });
+        set({ layers: newLayers, undoStack: [...undoStack, { changes: [], layerId: activeLayerId }] });
+      },
+
+      rotateCanvas: (direction) => {
+        const { layers, project, undoStack, activeLayerId } = get();
+        const { width, height } = project;
+        const newWidth = height;
+        const newHeight = width;
+        const newLayers = layers.map((layer) => {
+          if (layer.locked || !layer.visible) return layer;
+          const oldPixels = toMap(layer.pixels);
+          const newPixels = new Map<string, string>();
+          oldPixels.forEach((color, key) => {
+            const [x, y] = key.split(',').map(Number);
+            const nx = direction === 'clockwise' ? height - 1 - y : y;
+            const ny = direction === 'clockwise' ? x : width - 1 - x;
+            newPixels.set(`${nx},${ny}`, color);
+          });
+          return { ...layer, pixels: newPixels };
+        });
+        set({
+          project: { ...project, width: newWidth, height: newHeight },
+          layers: newLayers,
+          undoStack: [...undoStack, { changes: [], layerId: activeLayerId }],
+        });
       },
 
       shortcuts: DEFAULT_SHORTCUTS,
