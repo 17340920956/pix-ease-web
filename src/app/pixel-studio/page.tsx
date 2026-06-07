@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useMemo, useEffect, useState } from 'react';
-import { X, Image as ImageIcon, Settings } from 'lucide-react';
+import { X, Image as ImageIcon, Settings, Pencil, Eraser, PaintBucket, Pipette, Move, Square, Circle, Minus, Hand, SprayCan, MousePointer2 } from 'lucide-react';
 import { usePixelStore } from '@/store/usePixelStore';
 import type { PixelChange } from '@/store/usePixelStore';
 import AuthGuard from '@/components/AuthGuard';
@@ -11,6 +11,20 @@ import PixelCanvas from './components/PixelCanvas';
 import ToolBar from './components/ToolBar';
 import LayerPanel from './components/LayerPanel';
 import TopMenuBar from './components/TopMenuBar';
+
+const TOOLS_LIST = [
+  { id: 'brush' as const, icon: <Pencil className="w-4 h-4" /> },
+  { id: 'eraser' as const, icon: <Eraser className="w-4 h-4" /> },
+  { id: 'bucket' as const, icon: <PaintBucket className="w-4 h-4" /> },
+  { id: 'picker' as const, icon: <Pipette className="w-4 h-4" /> },
+  { id: 'select' as const, icon: <MousePointer2 className="w-4 h-4" /> },
+  { id: 'line' as const, icon: <Minus className="w-4 h-4" /> },
+  { id: 'rect' as const, icon: <Square className="w-4 h-4" /> },
+  { id: 'ellipse' as const, icon: <Circle className="w-4 h-4" /> },
+  { id: 'move' as const, icon: <Move className="w-4 h-4" /> },
+  { id: 'hand' as const, icon: <Hand className="w-4 h-4" /> },
+  { id: 'spray' as const, icon: <SprayCan className="w-4 h-4" /> },
+];
 
 export default function PixelStudioPage() {
   return (
@@ -46,6 +60,7 @@ function PixelStudioContent() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
+  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -53,6 +68,56 @@ function PixelStudioContent() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const el = canvasAreaRef.current;
+    if (!el) return;
+
+    const getTouchDistance = (touches: TouchList) => {
+      if (touches.length < 2) return 0;
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        pinchRef.current = {
+          startDist: getTouchDistance(e.touches),
+          startScale: store.viewport.scale,
+        };
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchRef.current) {
+        e.preventDefault();
+        const dist = getTouchDistance(e.touches);
+        const ratio = dist / pinchRef.current.startDist;
+        const newScale = Math.max(1, Math.min(128, Math.round(pinchRef.current.startScale * ratio)));
+        store.setViewport({ scale: newScale });
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        pinchRef.current = null;
+      }
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: false });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd);
+    el.addEventListener('touchcancel', handleTouchEnd);
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [isMobile, store]);
 
   const generateExportDataUrl = useCallback((pixelSize: number, withBorder: boolean, bSize: number, withGrid: boolean, gColor: string) => {
     const allPixels = new Map<string, string>();
@@ -355,7 +420,7 @@ function PixelStudioContent() {
 
       {/* 主体：左侧工具栏 + 中间画布 + 右侧面板（桌面端） */}
       {/* 主体：底部工具栏 + 中间画布 + 弹出面板（移动端） */}
-      <div className="flex-1 relative" style={{ overflow: 'hidden' }}>
+      <div className={`flex-1 ${isMobile ? '' : 'flex'} relative`} style={{ overflow: 'hidden' }}>
         {/* 桌面端左侧工具栏 */}
         <div
           className={`${isMobile ? 'hidden' : 'flex'} flex-shrink-0 py-2`}
@@ -380,22 +445,64 @@ function PixelStudioContent() {
         {/* 移动端底部工具栏 */}
         {isMobile && (
           <div
-            className="absolute left-0 bottom-0 right-0 z-20 overflow-x-auto py-1 px-2"
+            className="absolute left-0 right-0 bottom-0 z-20 overflow-x-auto"
             style={{
               backgroundColor: 'var(--card-bg)',
               borderTop: '1px solid var(--border-color)',
             }}
           >
-            <ToolBar
-              mobileMode
-              activeTool={store.tool as any}
-              brushSize={store.brushSize}
-              activeColor={store.color}
-              secondaryColor={store.secondaryColor}
-              onSelectTool={(tool) => store.setTool(tool)}
-              onSetBrushSize={store.setBrushSize}
-              onSwapColors={store.swapColors}
-            />
+            <div className="flex items-center gap-0.5 px-1 py-1 min-w-max">
+              {TOOLS_LIST.map((tool) => (
+                <button
+                  key={tool.id}
+                  onClick={() => store.setTool(tool.id)}
+                  className="w-9 h-8 flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+                  style={{
+                    backgroundColor: store.tool === tool.id ? 'var(--primary)' : 'transparent',
+                    color: store.tool === tool.id ? '#ffffff' : 'var(--text-secondary)',
+                  }}
+                >
+                  {tool.icon}
+                </button>
+              ))}
+              <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 6, 8].map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => store.setBrushSize(size)}
+                    className="w-7 h-7 flex items-center justify-center rounded flex-shrink-0"
+                    style={{
+                      backgroundColor: store.brushSize === size ? 'var(--primary-light)' : 'transparent',
+                    }}
+                  >
+                    <div
+                      className="rounded-full"
+                      style={{
+                        width: Math.min(size * 2 + 2, 14),
+                        height: Math.min(size * 2 + 2, 14),
+                        backgroundColor: store.brushSize === size ? 'var(--primary)' : 'var(--text-secondary)',
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+              <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
+              <button
+                onClick={store.swapColors}
+                className="relative w-8 h-8 cursor-pointer flex-shrink-0"
+                title="交换颜色"
+              >
+                <div
+                  className="absolute top-0 left-0 w-6 h-6 rounded"
+                  style={{ backgroundColor: store.color, border: '1px solid rgba(128,128,128,0.55)' }}
+                />
+                <div
+                  className="absolute bottom-0 right-0 w-6 h-6 rounded"
+                  style={{ backgroundColor: store.secondaryColor, border: '1px solid rgba(128,128,128,0.55)' }}
+                />
+              </button>
+            </div>
           </div>
         )}
 

@@ -13,7 +13,8 @@ import {
   FlipHorizontal,
   FlipVertical,
   RotateCw,
-  RotateCcw as RotateCcwIcon,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 
 const springFast = { type: 'spring' as const, stiffness: 420, damping: 32, mass: 0.7 };
@@ -111,9 +112,9 @@ export default memo(function TopMenuBar({
       }}
     >
       <ToolbarButton onClick={onUndo} disabled={!canUndo} label="撤销 (Ctrl+Z)"
-        icon={<RotateCcw className="w-4 h-4" />} />
+        icon={<ArrowLeft className="w-4 h-4" />} />
       <ToolbarButton onClick={onRedo} disabled={!canRedo} label="重做 (Ctrl+Shift+Z)"
-        icon={<RotateCcw className="w-4 h-4 scale-x-[-1]" />} />
+        icon={<ArrowRight className="w-4 h-4" />} />
 
       <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-color)' }} />
 
@@ -140,7 +141,7 @@ export default memo(function TopMenuBar({
       <ToolbarButton onClick={onRotateClockwise} label="顺时针旋转90°"
         icon={<RotateCw className="w-4 h-4" />} />
       <ToolbarButton onClick={onRotateCounterClockwise} label="逆时针旋转90°"
-        icon={<RotateCcwIcon className="w-4 h-4" />} />
+        icon={<RotateCcw className="w-4 h-4" />} />
 
       <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-color)' }} />
 
