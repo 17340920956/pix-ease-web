@@ -36,6 +36,7 @@ interface ToolBarProps {
   brushSize: number;
   activeColor: string;
   secondaryColor: string;
+  mobileMode?: boolean;
   onSelectTool: (tool: PixelTool) => void;
   onSetBrushSize: (size: number) => void;
   onSwapColors: () => void;
@@ -134,10 +135,65 @@ export default memo(function ToolBar({
   brushSize,
   activeColor,
   secondaryColor,
+  mobileMode,
   onSelectTool,
   onSetBrushSize,
   onSwapColors,
 }: ToolBarProps) {
+  if (mobileMode) {
+    return (
+      <div className="flex items-center gap-0.5 px-1">
+        {TOOLS.map((tool) => (
+          <ToolButton
+            key={tool.id}
+            tool={tool}
+            isActive={activeTool === tool.id}
+            onSelect={onSelectTool}
+          />
+        ))}
+
+        <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
+
+        <div className="flex items-center gap-0.5">
+          {BRUSH_SIZES.map((size) => (
+            <BrushSizeButton
+              key={size}
+              size={size}
+              isActive={brushSize === size}
+              onSelect={() => onSetBrushSize(size)}
+            />
+          ))}
+        </div>
+
+        <div className="w-px h-6 mx-1 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
+
+        <motion.div
+          className="relative w-8 h-8 cursor-pointer flex-shrink-0"
+          onClick={onSwapColors}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.92 }}
+          transition={springFast}
+          title="交换颜色 (X)"
+        >
+          <div
+            className="absolute top-0 left-0 w-6 h-6 rounded transition-transform hover:scale-105"
+            style={{ backgroundColor: activeColor, border: '1px solid rgba(128,128,128,0.55)' }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-6 h-6 rounded transition-transform hover:scale-105"
+            style={{ backgroundColor: secondaryColor, border: '1px solid rgba(128,128,128,0.55)' }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <ArrowUpDown
+              className="w-3 h-3"
+              style={{ color: '#fff', filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.85))' }}
+            />
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center gap-0.5 py-2">
       {TOOLS.map((tool) => (

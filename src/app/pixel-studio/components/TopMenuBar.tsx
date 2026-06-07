@@ -103,7 +103,7 @@ export default memo(function TopMenuBar({
 
   return (
     <div
-      className="flex items-center gap-0.5 px-2 py-1 flex-shrink-0"
+      className="flex items-center gap-0.5 px-2 py-1 flex-shrink-0 overflow-x-auto scrollbar-hide"
       style={{
         backgroundColor: 'var(--card-bg)',
         borderBottom: '1px solid var(--border-color)',
