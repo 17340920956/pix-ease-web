@@ -48,6 +48,11 @@ function PixelStudioContent() {
   // 移动端面板状态
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showMobileColorPicker, setShowMobileColorPicker] = useState(false);
+  // 导入图片预览状态
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [importPreviewUrl, setImportPreviewUrl] = useState('');
+  const [importTargetW, setImportTargetW] = useState(64);
+  const [importFileName, setImportFileName] = useState('');
 
   const generateExportDataUrl = useCallback((pixelSize: number, withBorder: boolean, bSize: number, withGrid: boolean, gColor: string) => {
     const allPixels = new Map<string, string>();
@@ -265,6 +270,7 @@ function PixelStudioContent() {
           image.src = URL.createObjectURL(file);
         });
 
+        // 计算合适的尺寸
         const maxDim = 128;
         let w = img.width;
         let h = img.height;
@@ -274,35 +280,57 @@ function PixelStudioContent() {
           h = Math.round(h * ratio);
         }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d')!;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, 0, 0, w, h);
-
-        store.setProjectSettings({ width: w, height: h });
-        store.clearCanvas();
-        setCanvasW(String(w));
-        setCanvasH(String(h));
-
-        const imageData = ctx.getImageData(0, 0, w, h).data;
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const idx = (y * w + x) * 4;
-            const r = imageData[idx], g = imageData[idx + 1], b = imageData[idx + 2], a = imageData[idx + 3];
-            if (a > 128) {
-              const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-              store.setPixel(x, y, hex);
-            }
-          }
-        }
+        setImportPreviewUrl(img.src);
+        setImportTargetW(w);
+        setImportFileName(file.name);
+        setShowImportPreview(true);
       } catch (err) {
         console.error('Import failed:', err);
       }
     },
-    [store]
+    []
   );
+
+  const handleConfirmImport = useCallback(() => {
+    if (!importPreviewUrl) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const w = Math.max(1, Math.min(256, importTargetW));
+      const ratio = w / img.width;
+      const h = Math.max(1, Math.min(256, Math.round(img.height * ratio)));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, w, h);
+
+      store.setProjectSettings({ width: w, height: h });
+      store.clearCanvas();
+      store.clearHistory();
+      setCanvasW(String(w));
+      setCanvasH(String(h));
+
+      const imageData = ctx.getImageData(0, 0, w, h).data;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = (y * w + x) * 4;
+          const r = imageData[idx], g = imageData[idx + 1], b = imageData[idx + 2], a = imageData[idx + 3];
+          if (a > 128) {
+            const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            store.setPixel(x, y, hex);
+          }
+        }
+      }
+
+      setShowImportPreview(false);
+      setImportPreviewUrl('');
+      store.resetViewport();
+    };
+    img.src = importPreviewUrl;
+  }, [importPreviewUrl, importTargetW, store]);
 
   const handleRefImageUpload = useCallback(
     async (file: File) => {
@@ -1142,6 +1170,97 @@ function PixelStudioContent() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 导入图片预览弹窗 */}
+      {showImportPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => setShowImportPreview(false)}>
+          <div
+            className="rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+              <div>
+                <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>导入图片</h2>
+                <p className="text-[11px] mt-0.5 truncate max-w-[200px]" style={{ color: 'var(--text-muted)' }}>{importFileName}</p>
+              </div>
+              <button
+                onClick={() => setShowImportPreview(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--button-bg)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* 原图预览 */}
+              <div className="space-y-2">
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>原图预览</span>
+                <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: 'var(--background)', height: '180px' }}>
+                  <img src={importPreviewUrl} alt="Import" className="max-w-full max-h-full object-contain" style={{ imageRendering: 'auto' }} />
+                </div>
+              </div>
+
+              {/* 像素化预览 */}
+              <div className="space-y-2">
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>像素化效果</span>
+                <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: 'var(--background)', height: '180px' }}>
+                  <img src={importPreviewUrl} alt="Pixelated" className="max-w-full max-h-full object-contain" style={{ imageRendering: 'pixelated', width: `${importTargetW * 2}px` }} />
+                </div>
+              </div>
+
+              {/* 尺寸设置 */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>导入尺寸</label>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>宽度: {importTargetW}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={8}
+                  max={256}
+                  value={importTargetW}
+                  onChange={(e) => setImportTargetW(Number(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  <span>8px</span>
+                  <span>128px</span>
+                  <span>256px</span>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>
+                导入后将自动调整画布大小并清空当前内容
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 px-5 pb-5">
+              <button
+                onClick={() => setShowImportPreview(false)}
+                className="flex-1 px-3 py-2.5 text-xs font-medium rounded-lg transition-colors"
+                style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--input-border)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--button-hover-bg)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--button-bg)'; }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmImport}
+                className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-lg transition-colors"
+                style={{ backgroundColor: 'var(--primary)', color: '#ffffff' }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+              >
+                导入到画布
+              </button>
             </div>
           </div>
         </div>
