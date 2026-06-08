@@ -633,81 +633,30 @@ function PixelStudioContent() {
         </div>
       </div>
 
-      {/* 移动端布局：画布全屏 + 底部可折叠面板 + 悬浮颜色弹窗 */}
-      <div className="lg:hidden flex-1 flex flex-col" style={{ overflow: 'hidden' }}>
-        {/* 顶部工具栏 */}
+      {/* 移动端布局：左侧工具栏 + 中间画布 + 右侧设置按钮 */}
+      <div className="lg:hidden flex-1 flex relative" style={{ overflow: 'hidden' }}>
+        {/* 左侧工具栏 */}
         <div
-          className="flex-shrink-0 py-1.5 border-b"
+          className="flex-shrink-0 py-2"
           style={{
             backgroundColor: 'var(--card-bg)',
-            borderColor: 'var(--border-color)',
+            borderRight: '1px solid var(--border-color)',
+            width: 48,
+            overflow: 'visible',
           }}
         >
-          <div className="flex items-center gap-0.5 px-2 overflow-x-auto">
-            {/* 工具选择 */}
-            <div className="flex items-center gap-0.5 flex-shrink-0">
-              <motion.button
-                onClick={() => store.setTool('brush')}
-                whileTap={{ scale: 0.9 }}
-                className="w-8 h-7 flex items-center justify-center rounded-md"
-                style={{ backgroundColor: store.tool === 'brush' ? 'var(--primary)' : 'transparent', color: store.tool === 'brush' ? '#fff' : 'var(--text-secondary)' }}
-              >
-                <Palette className="w-4 h-4" />
-              </motion.button>
-              <motion.button
-                onClick={() => store.setTool('eraser')}
-                whileTap={{ scale: 0.9 }}
-                className="w-8 h-7 flex items-center justify-center rounded-md"
-                style={{ backgroundColor: store.tool === 'eraser' ? 'var(--primary)' : 'transparent', color: store.tool === 'eraser' ? '#fff' : 'var(--text-secondary)' }}
-              >
-                <X className="w-4 h-4" />
-              </motion.button>
-              <motion.button
-                onClick={() => store.setTool('bucket')}
-                whileTap={{ scale: 0.9 }}
-                className="w-8 h-7 flex items-center justify-center rounded-md"
-                style={{ backgroundColor: store.tool === 'bucket' ? 'var(--primary)' : 'transparent', color: store.tool === 'bucket' ? '#fff' : 'var(--text-secondary)' }}
-              >
-                <ImageIcon className="w-4 h-4" />
-              </motion.button>
-            </div>
-            <div className="w-px h-5 mx-0.5 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
-            {/* 画笔尺寸 */}
-            <div className="flex items-center gap-0.5 flex-shrink-0">
-              {[1, 2, 3, 4, 6].map((size) => (
-                <motion.button
-                  key={size}
-                  onClick={() => store.setBrushSize(size)}
-                  whileTap={{ scale: 0.9 }}
-                  className="w-7 h-7 flex items-center justify-center rounded"
-                  style={{ backgroundColor: store.brushSize === size ? 'var(--primary-light)' : 'transparent' }}
-                >
-                  <div className="rounded-full" style={{ width: Math.min(size * 2 + 2, 14), height: Math.min(size * 2 + 2, 14), backgroundColor: store.brushSize === size ? 'var(--primary)' : 'var(--text-secondary)' }} />
-                </motion.button>
-              ))}
-            </div>
-            <div className="w-px h-5 mx-0.5 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
-            {/* 颜色按钮（点击打开弹窗） */}
-            <button
-              onClick={() => setShowMobileColorPicker(true)}
-              className="relative w-7 h-7 rounded-md flex-shrink-0 flex items-center justify-center"
-              style={{ backgroundColor: store.color }}
-            >
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border" style={{ backgroundColor: store.secondaryColor, borderColor: 'var(--card-bg)' }} />
-            </button>
-            {/* 设置面板切换按钮 */}
-            <motion.button
-              onClick={() => setMobilePanelOpen(!mobilePanelOpen)}
-              whileTap={{ scale: 0.9 }}
-              className="w-7 h-7 flex items-center justify-center rounded-md flex-shrink-0"
-              style={{ backgroundColor: mobilePanelOpen ? 'var(--primary-light)' : 'transparent', color: mobilePanelOpen ? 'var(--primary)' : 'var(--text-secondary)' }}
-            >
-              <Layers className="w-4 h-4" />
-            </motion.button>
-          </div>
+          <ToolBar
+            activeTool={store.tool as any}
+            brushSize={store.brushSize}
+            activeColor={store.color}
+            secondaryColor={store.secondaryColor}
+            onSelectTool={(tool) => store.setTool(tool)}
+            onSetBrushSize={store.setBrushSize}
+            onSwapColors={store.swapColors}
+          />
         </div>
 
-        {/* 画布区域（全屏占满） */}
+        {/* 画布区域 */}
         <div
           className="flex-1 overflow-auto relative"
           style={{ backgroundColor: 'var(--background)' }}
@@ -750,134 +699,206 @@ function PixelStudioContent() {
           </div>
         </div>
 
-        {/* 底部可折叠面板 */}
-        {mobilePanelOpen && (
-          <div
-            className="flex-shrink-0 border-t overflow-y-auto"
+        {/* 右侧设置按钮 */}
+        <div
+          className="absolute top-2 right-2 flex flex-col gap-1 z-10"
+        >
+          {/* 颜色按钮 */}
+          <button
+            onClick={() => setShowMobileColorPicker(true)}
+            className="w-9 h-9 rounded-xl shadow-lg flex items-center justify-center"
+            style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
+          >
+            <div className="relative w-5 h-5">
+              <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: store.color }} />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border" style={{ backgroundColor: store.secondaryColor, borderColor: 'var(--card-bg)' }} />
+            </div>
+          </button>
+          {/* 设置面板按钮 */}
+          <motion.button
+            onClick={() => setMobilePanelOpen(!mobilePanelOpen)}
+            whileTap={{ scale: 0.9 }}
+            className="w-9 h-9 rounded-xl shadow-lg flex items-center justify-center"
             style={{
-              backgroundColor: 'var(--card-bg)',
-              borderColor: 'var(--border-color)',
-              maxHeight: '240px',
+              backgroundColor: mobilePanelOpen ? 'var(--primary)' : 'var(--card-bg)',
+              border: '1px solid var(--border-color)',
+              color: mobilePanelOpen ? '#fff' : 'var(--text-secondary)',
             }}
           >
-            <div className="p-2 space-y-2">
-              {/* 图层管理 */}
-              <div className="rounded-lg p-2" style={{ backgroundColor: 'var(--button-bg)' }}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-                    <Layers className="w-3 h-3" />
-                    图层
-                  </span>
-                  <button onClick={() => store.addLayer(`图层 ${store.layers.length + 1}`)} className="px-2 py-0.5 text-[10px] rounded" style={{ backgroundColor: 'var(--primary)', color: '#fff' }}>
-                    + 添加
-                  </button>
+            <Layers className="w-4 h-4" />
+          </motion.button>
+        </div>
+
+        {/* 设置面板弹窗（从右侧滑入） */}
+        {mobilePanelOpen && (
+          <div
+            className="fixed inset-0 z-40 lg:hidden"
+            style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+            onClick={() => setMobilePanelOpen(false)}
+          >
+            <div
+              className="absolute right-0 top-0 bottom-0 w-72 overflow-y-auto p-3 space-y-3"
+              style={{ backgroundColor: 'var(--card-bg)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>设置</h3>
+                <button onClick={() => setMobilePanelOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ color: 'var(--text-secondary)' }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* 色卡 */}
+              <div className="rounded-xl p-2" style={{ backgroundColor: 'var(--button-bg)' }}>
+                <ColorPalette
+                  colors={store.palette}
+                  activeColor={store.color}
+                  secondaryColor={store.secondaryColor}
+                  onSelectColor={store.setColor}
+                  onSetSecondaryColor={store.setSecondaryColor}
+                  activePaletteId={store.activePaletteId}
+                  onSwitchPalette={store.setActivePalette}
+                  onAddColor={store.addPaletteColor}
+                />
+              </div>
+
+              {/* 主/副色 + 背景色 */}
+              <div className="rounded-xl p-3 space-y-3" style={{ backgroundColor: 'var(--button-bg)' }}>
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>颜色</span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded border-2 cursor-pointer" style={{ backgroundColor: store.color, borderColor: 'var(--input-border)' }} onClick={() => primaryColorRef.current?.click()} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>主色</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded border-2 cursor-pointer" style={{ backgroundColor: store.secondaryColor, borderColor: 'var(--input-border)' }} onClick={() => secondaryColorRef.current?.click()} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>副色</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-1 overflow-x-auto">
-                  {store.layers.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => store.setActiveLayer(l.id)}
-                      className="px-2 py-1 text-[10px] rounded flex-shrink-0"
-                      style={{
-                        backgroundColor: store.activeLayerId === l.id ? 'var(--primary)' : 'var(--button-bg)',
-                        color: store.activeLayerId === l.id ? '#fff' : 'var(--text-secondary)',
-                      }}
-                    >
-                      {l.name}
-                    </button>
-                  ))}
+                <div className="w-full" style={{ height: '1px', backgroundColor: 'var(--border-color)' }} />
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>背景色</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg border-2 cursor-pointer" style={{ backgroundColor: store.project.backgroundColor, borderColor: 'var(--input-border)' }} onClick={() => bgColorRef.current?.click()} />
+                    <button onClick={() => store.setProjectSettings({ backgroundColor: '#ffffff' })} className="px-2 py-1 text-[10px] font-medium rounded transition-colors" style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--input-border)' }}>重置白色</button>
+                  </div>
                 </div>
               </div>
 
+              {/* 图层 */}
+              <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--button-bg)' }}>
+                <LayerPanel
+                  layers={store.layers.map((l) => ({
+                    id: l.id,
+                    name: l.name,
+                    visible: l.visible,
+                    locked: l.locked,
+                    opacity: l.opacity,
+                  }))}
+                  activeLayerId={store.activeLayerId}
+                  onSelectLayer={store.setActiveLayer}
+                  onAddLayer={() => store.addLayer(`图层 ${store.layers.length + 1}`)}
+                  onRemoveLayer={store.removeLayer}
+                  onDuplicateLayer={store.duplicateLayer}
+                  onToggleVisibility={store.toggleLayerVisibility}
+                  onToggleLock={store.toggleLayerLock}
+                  onSetOpacity={store.setLayerOpacity}
+                  onMoveLayer={store.moveLayer}
+                  onMergeDown={store.mergeLayerDown}
+                />
+              </div>
+
+              {/* 参考图片 */}
+              <div className="rounded-xl p-3 space-y-2" style={{ backgroundColor: 'var(--button-bg)' }}>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>参考图片</span>
+                <input ref={refImageFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { handleRefImageUpload(f); e.target.value = ''; } }} />
+                <div className="flex gap-1">
+                  <button onClick={() => refImageFileRef.current?.click()} className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded transition-colors flex items-center justify-center gap-1" style={{ backgroundColor: store.referenceImage ? 'var(--primary-light)' : 'var(--button-bg)', color: store.referenceImage ? 'var(--primary)' : 'var(--text-secondary)', border: '1px solid var(--input-border)' }}>
+                    <ImageIcon className="w-3 h-3" />
+                    {store.referenceImage ? '已上传' : '上传'}
+                  </button>
+                  {store.referenceImage && (
+                    <button onClick={() => store.setReferenceImage(null)} className="px-2 py-1.5 text-[10px] font-medium rounded transition-colors" style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--input-border)' }}>移除</button>
+                  )}
+                </div>
+                {store.referenceImage && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>透明度</span>
+                    <input type="range" min={0.1} max={1} step={0.05} value={store.referenceOpacity} onChange={(e) => store.setReferenceOpacity(Number(e.target.value))} className="flex-1" />
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)', width: 24 }}>{Math.round(store.referenceOpacity * 100)}%</span>
+                  </div>
+                )}
+              </div>
+
               {/* 画布尺寸 */}
-              <div className="flex items-center gap-1">
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>尺寸</span>
-                <input type="number" value={canvasW} onChange={(e) => setCanvasW(e.target.value)} className="w-12 px-1 py-0.5 text-xs text-center rounded" style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }} min={1} max={256} />
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>×</span>
-                <input type="number" value={canvasH} onChange={(e) => setCanvasH(e.target.value)} className="w-12 px-1 py-0.5 text-xs text-center rounded" style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }} min={1} max={256} />
-                <button onClick={handleResize} className="px-2 py-0.5 text-[10px] rounded flex-shrink-0" style={{ backgroundColor: 'var(--primary)', color: '#fff' }}>调整</button>
+              <div className="rounded-xl p-3 space-y-2" style={{ backgroundColor: 'var(--button-bg)' }}>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>画布尺寸</span>
+                <div className="flex items-center gap-1">
+                  <input type="number" value={canvasW} onChange={(e) => setCanvasW(e.target.value)} className="w-14 px-1.5 py-1 text-xs text-center rounded" style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }} min={1} max={256} />
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>×</span>
+                  <input type="number" value={canvasH} onChange={(e) => setCanvasH(e.target.value)} className="w-14 px-1.5 py-1 text-xs text-center rounded" style={{ backgroundColor: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }} min={1} max={256} />
+                  <button onClick={handleResize} className="px-2 py-1 text-[10px] font-medium rounded transition-colors flex-shrink-0" style={{ backgroundColor: 'var(--primary)', color: '#ffffff' }}>调整</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 颜色选择弹窗 */}
+        {showMobileColorPicker && (
+          <div
+            className="fixed inset-0 z-50 lg:hidden"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setShowMobileColorPicker(false)}
+          >
+            <div
+              className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-4 space-y-3"
+              style={{ backgroundColor: 'var(--card-bg)', maxHeight: '70vh', overflowY: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>选择颜色</h3>
+                <button onClick={() => setShowMobileColorPicker(false)} className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ color: 'var(--text-secondary)' }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl border-2 cursor-pointer" style={{ backgroundColor: store.color, borderColor: 'var(--primary)' }} onClick={() => primaryColorRef.current?.click()} />
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>主色</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl border-2 cursor-pointer" style={{ backgroundColor: store.secondaryColor, borderColor: 'var(--text-muted)' }} onClick={() => secondaryColorRef.current?.click()} />
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>副色</span>
+                </div>
+                <motion.button onClick={store.swapColors} whileTap={{ scale: 0.9, rotate: 180 }} className="px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)' }}>交换</motion.button>
+              </div>
+
+              <div className="rounded-xl p-2" style={{ backgroundColor: 'var(--button-bg)' }}>
+                <ColorPalette
+                  colors={store.palette}
+                  activeColor={store.color}
+                  secondaryColor={store.secondaryColor}
+                  onSelectColor={store.setColor}
+                  onSetSecondaryColor={store.setSecondaryColor}
+                  activePaletteId={store.activePaletteId}
+                  onSwitchPalette={store.setActivePalette}
+                  onAddColor={store.addPaletteColor}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>背景</span>
+                <div className="w-8 h-8 rounded-lg border-2 cursor-pointer" style={{ backgroundColor: store.project.backgroundColor, borderColor: 'var(--input-border)' }} onClick={() => bgColorRef.current?.click()} />
+                <button onClick={() => store.setProjectSettings({ backgroundColor: '#ffffff' })} className="px-3 py-1.5 text-xs rounded-lg" style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--input-border)' }}>重置白色</button>
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* 移动端颜色选择弹窗 */}
-      {showMobileColorPicker && (
-        <div
-          className="fixed inset-0 z-50 lg:hidden"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setShowMobileColorPicker(false)}
-        >
-          <div
-            className="absolute bottom-0 left-0 right-0 rounded-t-2xl p-4 space-y-3"
-            style={{ backgroundColor: 'var(--card-bg)', maxHeight: '70vh', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>选择颜色</h3>
-              <button onClick={() => setShowMobileColorPicker(false)} className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ color: 'var(--text-secondary)' }}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* 主色/副色显示 */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-10 h-10 rounded-xl border-2 cursor-pointer"
-                  style={{ backgroundColor: store.color, borderColor: 'var(--primary)' }}
-                  onClick={() => primaryColorRef.current?.click()}
-                />
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>主色</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-10 h-10 rounded-xl border-2 cursor-pointer"
-                  style={{ backgroundColor: store.secondaryColor, borderColor: 'var(--text-muted)' }}
-                  onClick={() => secondaryColorRef.current?.click()}
-                />
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>副色</span>
-              </div>
-              <motion.button
-                onClick={store.swapColors}
-                whileTap={{ scale: 0.9, rotate: 180 }}
-                className="px-3 py-2 rounded-lg text-xs"
-                style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)' }}
-              >
-                交换
-              </motion.button>
-            </div>
-
-            {/* 色卡 */}
-            <div className="rounded-xl p-2" style={{ backgroundColor: 'var(--button-bg)' }}>
-              <ColorPalette
-                colors={store.palette}
-                activeColor={store.color}
-                secondaryColor={store.secondaryColor}
-                onSelectColor={store.setColor}
-                onSetSecondaryColor={store.setSecondaryColor}
-                activePaletteId={store.activePaletteId}
-                onSwitchPalette={store.setActivePalette}
-                onAddColor={store.addPaletteColor}
-              />
-            </div>
-
-            {/* 背景色 */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>背景</span>
-              <div
-                className="w-8 h-8 rounded-lg border-2 cursor-pointer"
-                style={{ backgroundColor: store.project.backgroundColor, borderColor: 'var(--input-border)' }}
-                onClick={() => bgColorRef.current?.click()}
-              />
-              <button onClick={() => store.setProjectSettings({ backgroundColor: '#ffffff' })} className="px-3 py-1.5 text-xs rounded-lg" style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)', border: '1px solid var(--input-border)' }}>
-                重置白色
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <canvas ref={exportCanvasRef} className="hidden" />
 
