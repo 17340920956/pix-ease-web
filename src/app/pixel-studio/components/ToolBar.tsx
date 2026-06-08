@@ -54,33 +54,38 @@ const ToolButton = memo(function ToolButton({
   const [showTip, setShowTip] = useState(false);
 
   return (
-    <motion.button
-      onClick={() => onSelect(tool.id)}
+    <div
+      className="relative"
       onMouseEnter={() => setShowTip(true)}
       onMouseLeave={() => setShowTip(false)}
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.92 }}
-      transition={springFast}
-      className="relative w-9 h-8 flex items-center justify-center rounded-lg transition-colors"
-      style={{
-        backgroundColor: showTip && !isActive ? 'var(--button-bg)' : isActive ? 'var(--primary)' : 'transparent',
-        color: showTip && !isActive ? 'var(--text-primary)' : isActive ? '#ffffff' : 'var(--text-secondary)',
-      }}
     >
-      {tool.icon}
+      <motion.button
+        onClick={() => onSelect(tool.id)}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
+        transition={springFast}
+        className="relative w-9 h-8 flex items-center justify-center rounded-lg transition-colors"
+        style={{
+          backgroundColor: isActive ? 'var(--primary)' : 'transparent',
+          color: isActive ? '#ffffff' : 'var(--text-secondary)',
+        }}
+      >
+        {tool.icon}
+      </motion.button>
       {showTip && (
         <span
-          className="absolute left-full ml-1.5 px-1.5 py-0.5 text-[10px] leading-none rounded whitespace-nowrap z-[999] border shadow-sm"
+          className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 text-[11px] font-medium leading-none rounded-md whitespace-nowrap z-[9999] border shadow-lg pointer-events-none"
           style={{
-            backgroundColor: 'var(--popover-bg, var(--card-bg))',
+            backgroundColor: 'var(--card-bg)',
             color: 'var(--text-primary)',
             borderColor: 'var(--border-color)',
           }}
         >
-          {tool.label} ({tool.shortcut})
+          {tool.label}
+          <span className="ml-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>({tool.shortcut})</span>
         </span>
       )}
-    </motion.button>
+    </div>
   );
 });
 
@@ -96,29 +101,33 @@ const BrushSizeButton = memo(function BrushSizeButton({
   const [showTip, setShowTip] = useState(false);
 
   return (
-    <motion.button
-      onClick={onSelect}
+    <div
+      className="relative"
       onMouseEnter={() => setShowTip(true)}
       onMouseLeave={() => setShowTip(false)}
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.92 }}
-      transition={springFast}
-      className="w-9 h-7 flex items-center justify-center rounded transition-colors relative"
-      style={{ backgroundColor: isActive ? 'var(--primary-light)' : 'transparent' }}
     >
-      <div
-        className="rounded-full transition-all"
-        style={{
-          width: Math.min(size * 2 + 2, 16),
-          height: Math.min(size * 2 + 2, 16),
-          backgroundColor: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-        }}
-      />
+      <motion.button
+        onClick={onSelect}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
+        transition={springFast}
+        className="w-9 h-7 flex items-center justify-center rounded transition-colors"
+        style={{ backgroundColor: isActive ? 'var(--primary-light)' : 'transparent' }}
+      >
+        <div
+          className="rounded-full transition-all"
+          style={{
+            width: Math.min(size * 2 + 2, 16),
+            height: Math.min(size * 2 + 2, 16),
+            backgroundColor: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+          }}
+        />
+      </motion.button>
       {showTip && (
         <span
-          className="absolute left-full ml-1.5 px-1.5 py-0.5 text-[10px] leading-none rounded whitespace-nowrap z-[999] border shadow-sm"
+          className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 text-[11px] font-medium leading-none rounded-md whitespace-nowrap z-[9999] border shadow-lg pointer-events-none"
           style={{
-            backgroundColor: 'var(--popover-bg, var(--card-bg))',
+            backgroundColor: 'var(--card-bg)',
             color: 'var(--text-primary)',
             borderColor: 'var(--border-color)',
           }}
@@ -126,7 +135,7 @@ const BrushSizeButton = memo(function BrushSizeButton({
           {size}px
         </span>
       )}
-    </motion.button>
+    </div>
   );
 });
 

@@ -406,13 +406,13 @@ function ImageToolContent() {
       <div className="w-full max-w-[1920px] mx-auto p-4 lg:p-6 space-y-6">
         {/* 处理类型选择 */}
         <div className="glass rounded-2xl p-4">
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {(['convert', 'compress', 'pixelate', 'ascii'] as ProcessType[]).map(
               (type) => (
                 <motion.button
                   key={type}
                   onClick={() => setProcessType(type)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-sm"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition-all text-sm"
                   style={{
                     backgroundColor: processType === type
                       ? type === 'convert' ? '#9333ea'
@@ -445,7 +445,8 @@ function ImageToolContent() {
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        {/* PC端布局：左侧图片列表 + 右侧设置面板 */}
+        <div className="hidden lg:flex flex-col lg:flex-row gap-6">
           {/* 左侧：图片列表和上传 */}
           <div className="flex-1 min-w-0 space-y-4 order-1">
             {/* 上传区域 */}
@@ -1279,6 +1280,506 @@ function ImageToolContent() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* 移动端布局：上下排列 */}
+        <div className="lg:hidden space-y-4">
+          {/* 上传区域 */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="glass rounded-2xl p-6 border-2 border-dashed cursor-pointer transition-colors"
+            style={{ borderColor: 'var(--input-border)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--input-border)'; }}
+          >
+            <div className="text-center">
+              <Upload className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
+              <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                上传图片
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                点击或拖拽上传图片文件
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </div>
+
+          {/* 设置面板 - 移动端始终显示 */}
+          <div className="glass rounded-2xl p-4 space-y-4">
+            <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>处理设置</h3>
+
+            {/* 格式转换设置 */}
+            {processType === 'convert' && (
+              <div className="space-y-3">
+                <label className="text-xs block" style={{ color: 'var(--text-secondary)' }}>目标格式</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'jpg', label: 'JPG' },
+                    { value: 'png', label: 'PNG' },
+                    { value: 'webp', label: 'WebP' },
+                    { value: 'avif', label: 'AVIF' },
+                    { value: 'heic', label: 'HEIC' },
+                    { value: 'svg', label: 'SVG' },
+                  ] as { value: ImageFormat; label: string }[]).map(
+                    (format) => (
+                      <motion.button
+                        key={format.value}
+                        onClick={() => setTargetFormat(format.value)}
+                        className="w-full px-2 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                        style={{
+                          backgroundColor: targetFormat === format.value ? 'var(--primary)' : 'var(--button-bg)',
+                          color: targetFormat === format.value ? '#ffffff' : 'var(--text-secondary)',
+                        }}
+                        whileTap={{ scale: 0.97 }} transition={springFast}
+                      >
+                        {format.label}
+                      </motion.button>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 压缩设置 */}
+            {processType === 'compress' && (
+              <div className="space-y-3">
+                <label className="text-xs block" style={{ color: 'var(--text-secondary)' }}>压缩质量</label>
+                <div className="space-y-1.5">
+                  {(
+                    [
+                      { value: 'lossless', label: '无损' },
+                      { value: 'high', label: '高清' },
+                      { value: 'extreme', label: '极限' },
+                      { value: 'custom', label: '自定义' },
+                    ] as { value: CompressQuality; label: string }[]
+                  ).map((option) => (
+                    <motion.button
+                      key={option.value}
+                      onClick={() => setCompressQuality(option.value)}
+                      className="w-full px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors"
+                      style={{
+                        backgroundColor: compressQuality === option.value ? 'var(--primary)' : 'var(--button-bg)',
+                        color: compressQuality === option.value ? '#ffffff' : 'var(--text-secondary)',
+                      }}
+                      whileTap={{ scale: 0.97 }} transition={springFast}
+                    >
+                      {option.label}
+                    </motion.button>
+                  ))}
+                </div>
+                {compressQuality === 'custom' && (
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                      质量: {customQuality}%
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={customQuality}
+                      onChange={(e) => setCustomQuality(parseInt(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 像素化设置 */}
+            {processType === 'pixelate' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs block mb-1.5" style={{ color: 'var(--text-secondary)' }}>风格</label>
+                  <div className="space-y-1.5">
+                    {(
+                      [
+                        { value: 'pixel', label: '像素风' },
+                        { value: 'gameboy', label: 'GameBoy' },
+                      ] as { value: PixelStyle; label: string }[]
+                    ).map((option) => (
+                      <motion.button
+                        key={option.value}
+                        onClick={() => setPixelStyle(option.value)}
+                        className="w-full px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors"
+                        style={{
+                          backgroundColor: pixelStyle === option.value ? 'var(--primary)' : 'var(--button-bg)',
+                          color: pixelStyle === option.value ? '#ffffff' : 'var(--text-secondary)',
+                        }}
+                        whileTap={{ scale: 0.97 }} transition={springFast}
+                      >
+                        {option.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    像素块: {pixelSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="4"
+                    max="64"
+                    value={pixelSize}
+                    onChange={(e) => setPixelSize(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    <Grid3x3 className="w-3.5 h-3.5" />
+                    显示网格
+                  </label>
+                  <motion.button
+                    onClick={() => setShowPixelGrid(!showPixelGrid)}
+                    className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                    style={{ backgroundColor: showPixelGrid ? 'var(--primary)' : 'var(--text-muted)' }}
+                    whileTap={{ scale: 0.97 }} transition={springFast}
+                  >
+                    <span
+                      className="inline-block h-3.5 w-3.5 transform rounded-full transition-transform"
+                      style={{
+                        backgroundColor: '#ffffff',
+                        transform: showPixelGrid ? 'translateX(1.125rem)' : 'translateX(0.125rem)',
+                      }}
+                    />
+                  </motion.button>
+                </div>
+              </div>
+            )}
+
+            {/* ASCII 设置 */}
+            {processType === 'ascii' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs block mb-1.5" style={{ color: 'var(--text-secondary)' }}>风格</label>
+                  <div className="space-y-1.5">
+                    {(
+                      [
+                        { value: 'ascii-bw', label: '黑白 ASCII' },
+                        { value: 'ascii-color', label: '彩色 ASCII' },
+                      ] as { value: PixelStyle; label: string }[]
+                    ).map((option) => (
+                      <motion.button
+                        key={option.value}
+                        onClick={() => { setPixelStyle(option.value); setAsciiBgColor('#0f172a'); setAsciiTextColorIndex(0); }}
+                        className="w-full px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors"
+                        style={{
+                          backgroundColor: pixelStyle === option.value ? 'var(--primary)' : 'var(--button-bg)',
+                          color: pixelStyle === option.value ? '#ffffff' : 'var(--text-secondary)',
+                        }}
+                        whileTap={{ scale: 0.97 }} transition={springFast}
+                      >
+                        {option.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs block mb-1.5" style={{ color: 'var(--text-secondary)' }}>背景颜色</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[
+                      { color: '#0f172a', name: '黑' },
+                      { color: '#ffffff', name: '白' },
+                      { color: '#fef3c7', name: '暖黄' },
+                      { color: '#dcfce7', name: '浅绿' },
+                      { color: '#dbeafe', name: '浅蓝' },
+                      { color: '#fce7f3', name: '浅粉' },
+                    ].map((preset) => {
+                      const isActive = asciiBgColor === preset.color;
+                      return (
+                        <button
+                          key={preset.color}
+                          onClick={() => setAsciiBgColor(preset.color)}
+                          className="w-6 h-6 rounded transition-transform flex-shrink-0"
+                          style={{
+                            backgroundColor: preset.color,
+                            transform: isActive ? 'scale(1.15)' : 'scale(1)',
+                            outline: isActive ? '2px solid var(--primary)' : 'none',
+                            outlineOffset: isActive ? 2 : 0,
+                          }}
+                          title={preset.name}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative w-6 h-6 rounded border overflow-hidden flex-shrink-0"
+                      style={{ borderColor: 'var(--input-border)' }}
+                    >
+                      <div className="w-full h-full" style={{ backgroundColor: asciiBgColor }} />
+                      <input
+                        type="color"
+                        value={asciiBgColor}
+                        onChange={(e) => setAsciiBgColor(e.target.value)}
+                        className="w-full h-full opacity-0 cursor-pointer absolute inset-0"
+                      />
+                    </div>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>#</span>
+                    <input
+                      type="text"
+                      value={asciiBgColor.replace('#', '')}
+                      onChange={(e) => {
+                        let value = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                        if (value.length > 0) setAsciiBgColor('#' + value);
+                      }}
+                      placeholder="000000"
+                      className="w-16 px-1.5 py-1 rounded text-xs font-mono uppercase focus:outline-none"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        border: '1px solid var(--input-border)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs block mb-1.5" style={{ color: 'var(--text-secondary)' }}>字符集</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(Object.entries(ASCII_PRESETS) as [AsciiPreset, typeof ASCII_PRESETS[string]][]).map(
+                      ([key, preset]) => (
+                        <motion.button
+                          key={key}
+                          onClick={() => setAsciiPreset(key)}
+                          className="px-2 py-1.5 rounded-lg text-xs font-medium text-left transition-colors"
+                          style={{
+                            backgroundColor: asciiPreset === key ? 'var(--primary)' : 'var(--button-bg)',
+                            color: asciiPreset === key ? '#ffffff' : 'var(--text-secondary)',
+                          }}
+                          whileTap={{ scale: 0.97 }} transition={springFast}
+                        >
+                          {preset.name}
+                        </motion.button>
+                      )
+                    )}
+                  </div>
+                </div>
+                {asciiPreset === 'custom' && (
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>自定义字符</label>
+                    <textarea
+                      value={asciiCustomChars}
+                      onChange={(e) => setAsciiCustomChars(e.target.value)}
+                      placeholder="输入自定义字符"
+                      className="w-full px-2 py-1.5 rounded text-xs focus:outline-none resize-none"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        border: '1px solid var(--input-border)',
+                        color: 'var(--text-primary)',
+                      }}
+                      rows={2}
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    输出宽度: {asciiWidth} 字符
+                  </label>
+                  <input
+                    type="range"
+                    min="40"
+                    max="200"
+                    value={asciiWidth}
+                    onChange={(e) => setAsciiWidth(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 图片列表 */}
+          {images.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  图片列表 ({images.length})
+                </h3>
+                <motion.button
+                  onClick={processImages}
+                  disabled={isProcessing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-xs"
+                  style={{
+                    backgroundColor: isProcessing ? 'var(--text-muted)' : 'var(--primary)',
+                    color: '#ffffff',
+                  }}
+                  whileTap={{ scale: 0.97 }} transition={springFast}
+                >
+                  {isProcessing ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  开始处理
+                </motion.button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {images.map((image) => {
+                  const typeColor = image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) : 'transparent';
+                  const typeColorLight = image.processParams?.processType ? getProcessTypeColor(image.processParams.processType) + '18' : 'transparent';
+                  return (
+                  <motion.div
+                    key={image.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="relative flex flex-col rounded-xl overflow-hidden"
+                    style={{
+                      backgroundColor: 'var(--card-bg)',
+                      border: '1px solid var(--border-color)',
+                    }}
+                  >
+                    <div className="aspect-square relative overflow-hidden"
+                      style={{
+                        backgroundImage: 'repeating-conic-gradient(var(--button-bg) 0% 25%, transparent 0% 50%) 50% / 16px 16px',
+                      }}>
+                      {image.status === 'completed' && image.processedUrl ? (
+                        <div className="w-full h-full flex">
+                          <div className="flex-1 relative cursor-pointer" style={{ borderRight: '1px solid var(--border-color)' }} onClick={() => setFullPreviewUrl(image.previewUrl)}>
+                            <img src={image.previewUrl} alt="Original" className="w-full h-full object-cover" />
+                            <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded">原图</div>
+                          </div>
+                          <div className="flex-1 relative cursor-pointer" onClick={() => setFullPreviewUrl(image.processedUrl!)}>
+                            <img src={image.processedUrl} alt="Processed" className="w-full h-full object-cover" />
+                            <div className="absolute top-1 right-1 text-white text-[9px] px-1 py-0.5 rounded" style={{ backgroundColor: typeColor }}>
+                              {image.processParams?.processType === 'convert' && '转换'}
+                              {image.processParams?.processType === 'compress' && '压缩'}
+                              {image.processParams?.processType === 'pixelate' && '像素'}
+                              {image.processParams?.processType === 'ascii' && 'ASCII'}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <img src={image.previewUrl} alt={image.file.name} className="w-full h-full object-cover cursor-pointer" onClick={() => setFullPreviewUrl(image.previewUrl)} />
+                      )}
+                    </div>
+
+                    <div className="p-2 space-y-1.5" style={{ backgroundColor: typeColorLight }}>
+                      <p className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                        {image.file.name}
+                      </p>
+                      {image.status !== 'completed' && (
+                        <div className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          <ImageIcon className="w-3 h-3" />
+                          <span>{formatFileSize(image.originalSize)}</span>
+                        </div>
+                      )}
+                      {image.status === 'completed' && image.processedSize && (
+                        <>
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span style={{ color: 'var(--text-muted)' }}>处理前</span>
+                            <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{formatFileSize(image.originalSize)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span style={{ color: 'var(--text-muted)' }}>处理后</span>
+                            <span className="font-medium" style={{ color: typeColor }}>{formatFileSize(image.processedSize)}</span>
+                          </div>
+                          <div className="grid grid-cols-10 gap-1 pt-1">
+                            <motion.button
+                              onClick={() => setCompareImage(image)}
+                              className="col-span-7 px-1.5 py-1 rounded text-[10px] font-medium flex items-center justify-center gap-1"
+                              style={{ backgroundColor: typeColor, color: '#ffffff' }}
+                              whileTap={{ scale: 0.97 }} transition={springFast}
+                            >
+                              <Eye className="w-3 h-3" />
+                              对比
+                            </motion.button>
+                            <motion.button
+                              onClick={() => {
+                                if (image.processedUrl) URL.revokeObjectURL(image.processedUrl);
+                                setAsciiResult('');
+                                updateImage(image.id, { status: 'pending', processedUrl: undefined, processedSize: undefined, processParams: undefined });
+                              }}
+                              className="col-span-3 px-1.5 py-1 rounded text-[10px] font-medium flex items-center justify-center"
+                              style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-secondary)' }}
+                              whileTap={{ scale: 0.97 }} transition={springFast}
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </motion.button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="absolute top-1.5 right-1.5 flex gap-1">
+                      {image.status === 'completed' && (
+                        <motion.button
+                          onClick={() => downloadImage(image)}
+                          className="p-1 text-white rounded"
+                          style={{ backgroundColor: 'var(--primary)' }}
+                          whileTap={{ scale: 0.9 }} transition={springFast}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </motion.button>
+                      )}
+                      <motion.button
+                        onClick={() => removeImage(image.id)}
+                        className="p-1 text-white rounded"
+                        style={{ backgroundColor: 'var(--danger)' }}
+                        whileTap={{ scale: 0.9 }} transition={springFast}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </motion.button>
+                    </div>
+
+                    {image.status === 'processing' && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* 清空按钮 */}
+              <motion.button
+                onClick={clearImages}
+                whileTap={{ scale: 0.97 }} transition={springFast}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                清空全部
+              </motion.button>
+
+              {/* 统计信息 */}
+              <div className="rounded-xl p-3 space-y-2" style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)' }}>
+                <h3 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>统计信息</h3>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                    <span>总文件数</span>
+                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{images.length}</span>
+                  </div>
+                  <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                    <span>总大小</span>
+                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {formatFileSize(images.reduce((sum, img) => sum + img.originalSize, 0))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between" style={{ color: 'var(--text-secondary)' }}>
+                    <span>已完成</span>
+                    <span className="font-medium" style={{ color: 'var(--success)' }}>
+                      {images.filter((img) => img.status === 'completed').length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useRef } from 'react';
+import { memo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Upload,
@@ -52,34 +52,54 @@ function ToolbarButton({
   active?: boolean;
   danger?: boolean;
 }) {
+  const [showTip, setShowTip] = useState(false);
+
   return (
-    <motion.button
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      whileHover={{ scale: disabled ? 1 : 1.08 }}
-      whileTap={{ scale: disabled ? 1 : 0.94 }}
-      transition={springFast}
-      className="w-8 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-25"
-      style={{
-        backgroundColor: active ? 'var(--primary-light)' : 'transparent',
-        color: danger ? 'var(--danger)' : active ? 'var(--primary)' : 'var(--text-secondary)',
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled && !active) {
-          e.currentTarget.style.backgroundColor = 'var(--button-bg)';
-          e.currentTarget.style.color = danger ? 'var(--danger)' : 'var(--text-primary)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.backgroundColor = 'transparent';
-          e.currentTarget.style.color = danger ? 'var(--danger)' : 'var(--text-secondary)';
-        }
-      }}
+    <div
+      className="relative"
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
     >
-      {icon}
-    </motion.button>
+      <motion.button
+        onClick={onClick}
+        disabled={disabled}
+        title={label}
+        whileHover={{ scale: disabled ? 1 : 1.08 }}
+        whileTap={{ scale: disabled ? 1 : 0.94 }}
+        transition={springFast}
+        className="w-8 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-25"
+        style={{
+          backgroundColor: active ? 'var(--primary-light)' : 'transparent',
+          color: danger ? 'var(--danger)' : active ? 'var(--primary)' : 'var(--text-secondary)',
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled && !active) {
+            e.currentTarget.style.backgroundColor = 'var(--button-bg)';
+            e.currentTarget.style.color = danger ? 'var(--danger)' : 'var(--text-primary)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!active) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = danger ? 'var(--danger)' : 'var(--text-secondary)';
+          }
+        }}
+      >
+        {icon}
+      </motion.button>
+      {showTip && !disabled && (
+        <span
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2 py-1 text-[11px] font-medium leading-none rounded-md whitespace-nowrap z-[9999] border shadow-lg pointer-events-none"
+          style={{
+            backgroundColor: 'var(--card-bg)',
+            color: 'var(--text-primary)',
+            borderColor: 'var(--border-color)',
+          }}
+        >
+          {label}
+        </span>
+      )}
+    </div>
   );
 }
 
