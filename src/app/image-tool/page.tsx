@@ -1827,7 +1827,9 @@ function ImageToolContent() {
                     <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>原图</span>
                     <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{formatFileSize(compareImage.originalSize)}</span>
                   </div>
-                  <div className="aspect-square rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--button-bg)' }}>
+                  <div className="aspect-square rounded-xl overflow-hidden cursor-pointer" style={{ backgroundColor: 'var(--button-bg)' }}
+                    onClick={() => setFullPreviewUrl(compareImage.previewUrl)}
+                  >
                     <img
                       src={compareImage.previewUrl}
                       alt="Original"

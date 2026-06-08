@@ -1,5 +1,6 @@
 import imageCompression from 'browser-image-compression';
 import { luminance } from '@/lib/colorUtils';
+import { pixelateWithMask, type PixelateMode } from '@/lib/pixelation/pixelate';
 
 /**
  * 图片工具函数
@@ -195,16 +196,18 @@ export async function compressImage(
 }
 
 /**
- * 像素化图片 - 智能采样保留细节
+ * 像素化图片 - 使用拼豆吧算法（区域平均采样 + 三模式支持）
  * @param file - 源文件
  * @param pixelSize - 像素块大小（每个像素块占用的原图像素数）
  * @param showGrid - 是否显示辅助网格
+ * @param mode - 像素化模式：photo(照片加权平均) | simple(简单平均) | illustration(插画平滑)
  * @returns 像素化后的 Blob
  */
 export async function pixelateImage(
   file: File,
   pixelSize: number = 8,
-  showGrid: boolean = false
+  showGrid: boolean = false,
+  mode: PixelateMode = 'simple'
 ): Promise<Blob> {
   const img = await readFileAsImage(file);
 
@@ -225,28 +228,18 @@ export async function pixelateImage(
     outWidth = Math.max(1, Math.round(outHeight * aspectRatio));
   }
 
-  // 第一步：高质量缩小采样（使用双线性过滤获取平均颜色）
-  const sampleCanvas = document.createElement('canvas');
-  sampleCanvas.width = outWidth;
-  sampleCanvas.height = outHeight;
-  const sampleCtx = sampleCanvas.getContext('2d')!;
-  sampleCtx.imageSmoothingEnabled = true;
-  sampleCtx.imageSmoothingQuality = 'high';
-  sampleCtx.drawImage(img, 0, 0, outWidth, outHeight);
+  // 获取原始图像数据
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = img.width;
+  srcCanvas.height = img.height;
+  const srcCtx = srcCanvas.getContext('2d')!;
+  srcCtx.drawImage(img, 0, 0);
+  const srcImageData = srcCtx.getImageData(0, 0, img.width, img.height);
 
-  // 获取缩小后的像素数据
-  const sampleData = sampleCtx.getImageData(0, 0, outWidth, outHeight).data;
+  // 使用拼豆算法像素化（无 mask，全区域处理）
+  const pixelated = pixelateWithMask(srcImageData, outWidth, outHeight, null, { mode });
 
-  // 第二步：中值滤波 + 边缘增强，保留重要细节
-  const processedData = new Uint8ClampedArray(sampleData.length);
-  for (let i = 0; i < sampleData.length; i += 4) {
-    processedData[i] = sampleData[i];
-    processedData[i + 1] = sampleData[i + 1];
-    processedData[i + 2] = sampleData[i + 2];
-    processedData[i + 3] = sampleData[i + 3];
-  }
-
-  // 第三步：放大到显示尺寸，使用最近邻保持硬边缘
+  // 放大到显示尺寸，使用最近邻保持硬边缘
   const displayScale = Math.max(1, Math.floor(Math.min(800 / outWidth, 800 / outHeight)));
   const finalWidth = outWidth * displayScale;
   const finalHeight = outHeight * displayScale;
@@ -261,7 +254,7 @@ export async function pixelateImage(
   midCanvas.width = outWidth;
   midCanvas.height = outHeight;
   const midCtx = midCanvas.getContext('2d')!;
-  midCtx.putImageData(new ImageData(processedData, outWidth, outHeight), 0, 0);
+  midCtx.putImageData(pixelated, 0, 0);
 
   // 使用最近邻放大
   finalCtx.imageSmoothingEnabled = false;
@@ -549,10 +542,13 @@ function detectWatermarkRegion(
 }
 
 /**
- * 转换为 ASCII 艺术
- * @param file - 源文件
- * @param options - ASCII 配置选项
- * @returns ASCII 字符串
+ * 转换为 ASCII 艺术 - 高质量算法
+ * 核心思路：
+ * 1. BFS flood-fill 从边缘标记背景区域（渐变背景也能被清理）
+ * 2. 主体内部相似颜色因不连通到边缘而保留（保护高光细节）
+ * 3. Floyd-Steinberg 抖动算法消除色带
+ * 4. Sobel 边缘检测作为 flood-fill 屏障
+ * 5. 大字符集映射保留丰富层次
  */
 export async function convertToAscii(
   file: File,
@@ -564,18 +560,12 @@ export async function convertToAscii(
   } = options;
 
   const chars = getAsciiChars(options);
-
-  if (!chars) {
-    throw new Error('字符集不能为空');
-  }
+  if (!chars) throw new Error('字符集不能为空');
 
   const img = await readFileAsImage(file);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
 
-  // 计算采样尺寸，保持原始宽高比
-  // 渲染时字符高宽比为 1.4 (14px/10px)，采样时需要补偿这个比例
-  // 否则渲染出来的形状会被纵向拉伸 1.4 倍
   const scale = asciiWidth / img.width;
   const width = asciiWidth;
   const height = Math.floor(img.height * scale / 1.4);
@@ -592,23 +582,13 @@ export async function convertToAscii(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
       const a = data[i + 3];
-
       if (a < 128) continue;
-
-      // 量化颜色到最近的主要颜色（减少颜色数量）
-      const quantizedR = Math.round(r / 20) * 20;
-      const quantizedG = Math.round(g / 20) * 20;
-      const quantizedB = Math.round(b / 20) * 20;
-      const key = `${quantizedR},${quantizedG},${quantizedB}`;
+      const key = `${Math.round(data[i] / 20) * 20},${Math.round(data[i + 1] / 20) * 20},${Math.round(data[i + 2] / 20) * 20}`;
       colorMap.set(key, (colorMap.get(key) || 0) + 1);
     }
   }
 
-  // 找出最常见的颜色作为主背景色
   let bgColor: [number, number, number] | null = null;
   let maxCount = 0;
   for (const [key, count] of colorMap) {
@@ -619,65 +599,133 @@ export async function convertToAscii(
     }
   }
 
-  // 判断背景色是亮色还是暗色
   const isBgLight = bgColor ? (bgColor[0] + bgColor[1] + bgColor[2]) / 3 > 128 : false;
 
-  // 检测水印区域
+  // 第二步：Sobel 边缘检测 + BFS flood-fill 标记背景区域
+  // 2a. Sobel 边缘检测
+  const edgeMap = new Float32Array(width * height);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const getGray = (px: number, py: number) => {
+        const idx = (py * width + px) * 4;
+        return 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+      };
+      const gx = -getGray(x-1,y-1) + getGray(x+1,y-1)
+                -2*getGray(x-1,y)   + 2*getGray(x+1,y)
+                -getGray(x-1,y+1) + getGray(x+1,y+1);
+      const gy = -getGray(x-1,y-1) - 2*getGray(x,y-1) - getGray(x+1,y-1)
+                +getGray(x-1,y+1) + 2*getGray(x,y+1) + getGray(x+1,y+1);
+      edgeMap[y * width + x] = Math.sqrt(gx * gx + gy * gy);
+    }
+  }
+
+  // 自适应边缘阈值
+  let edgeSum = 0, edgeCount = 0;
+  for (let i = 0; i < width * height; i++) {
+    if (edgeMap[i] > 0) { edgeSum += edgeMap[i]; edgeCount++; }
+  }
+  const avgEdge = edgeCount > 0 ? edgeSum / edgeCount : 0;
+  const edgeThreshold = Math.max(25, avgEdge * 1.2);
+
+  // 辅助函数：判断像素颜色是否接近背景色
+  function isNearBg(d: Uint8ClampedArray, idx: number, bg: [number, number, number], threshold: number): boolean {
+    const diff = Math.abs(d[idx * 4] - bg[0]) + Math.abs(d[idx * 4 + 1] - bg[1]) + Math.abs(d[idx * 4 + 2] - bg[2]);
+    return diff < threshold;
+  }
+
+  // 2b. BFS flood-fill：从边缘开始扩散
+  const isBgArea = new Uint8Array(width * height);
+  const visited = new Uint8Array(width * height);
+  const queue: number[] = [];
+
+  // 边缘入队
+  if (bgColor) {
+    for (let x = 0; x < width; x++) {
+      const topIdx = x, bottomIdx = (height - 1) * width + x;
+      if (isNearBg(data, topIdx, bgColor, 25)) { queue.push(topIdx); visited[topIdx] = 1; }
+      if (isNearBg(data, bottomIdx, bgColor, 25)) { queue.push(bottomIdx); visited[bottomIdx] = 1; }
+    }
+    for (let y = 1; y < height - 1; y++) {
+      const leftIdx = y * width, rightIdx = y * width + width - 1;
+      if (isNearBg(data, leftIdx, bgColor, 25)) { queue.push(leftIdx); visited[leftIdx] = 1; }
+      if (isNearBg(data, rightIdx, bgColor, 25)) { queue.push(rightIdx); visited[rightIdx] = 1; }
+    }
+
+    while (queue.length > 0) {
+      const idx = queue.shift()!;
+      const cx = idx % width;
+      const cy = (idx / width) | 0;
+      isBgArea[idx] = 1;
+
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const nidx = ny * width + nx;
+            if (!visited[nidx]) {
+              // 强边缘作为屏障（主体轮廓）
+              if (edgeMap[nidx] > edgeThreshold * 2.0) continue;
+              // 颜色接近背景色直接通过
+              if (isNearBg(data, nidx, bgColor, 70)) {
+                visited[nidx] = 1;
+                queue.push(nidx);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 第三步：Floyd-Steinberg 抖动
+  const gray = new Float32Array(width * height);
+  for (let i = 0; i < width * height; i++) {
+    gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      const oldGray = gray[i];
+      const newGray = Math.round(oldGray / 255 * (chars.length - 1)) / (chars.length - 1) * 255;
+      const error = oldGray - newGray;
+      gray[i] = newGray;
+
+      if (x + 1 < width) gray[y * width + x + 1] += error * (7 / 16);
+      if (y + 1 < height) {
+        if (x - 1 >= 0) gray[(y + 1) * width + x - 1] += error * (3 / 16);
+        gray[(y + 1) * width + x] += error * (5 / 16);
+        if (x + 1 < width) gray[(y + 1) * width + x + 1] += error * (1 / 16);
+      }
+    }
+  }
+
+  // 第四步：生成 ASCII
+  const sortedChars = chars.split('').reverse().join('');
+  const charLen = sortedChars.length;
   const watermarkRegion = detectWatermarkRegion(data, width, height);
 
   let ascii = '';
-  let charIndex = 0;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
       const a = data[i + 3];
 
-      // 跳过透明像素
-      if (a < 50) {
-        ascii += ' ';
-        continue;
-      }
+      if (a < 50) { ascii += ' '; continue; }
+      if (watermarkRegion && y >= watermarkRegion.startY && y <= watermarkRegion.endY) { ascii += ' '; continue; }
+      if (isBgArea[y * width + x]) { ascii += ' '; continue; }
 
-      // 如果当前像素在水印区域内，跳过转换（输出空格）
-      if (watermarkRegion && y >= watermarkRegion.startY && y <= watermarkRegion.endY) {
-        ascii += ' ';
-        continue;
-      }
-
-      // 检测是否与背景色接近（纯色背景区域不生成字符）
-      let isBackground = false;
-      if (bgColor) {
-        const colorDiff = Math.abs(r - bgColor[0]) + Math.abs(g - bgColor[1]) + Math.abs(b - bgColor[2]);
-        // 颜色差异小于阈值视为背景
-        isBackground = colorDiff < 60;
-      }
-
-      // 对于亮色背景：接近白色/背景色 → 空格
-      // 对于暗色背景：接近黑色/背景色 → 空格
-      if (isBgLight) {
-        // 亮色背景：跳过接近背景色或非常亮的区域
-        if (isBackground || (r > 230 && g > 230 && b > 230)) {
-          ascii += ' ';
-          continue;
-        }
-      } else {
-        // 暗色背景：跳过接近背景色或非常暗的区域
-        if (isBackground || (r < 30 && g < 30 && b < 30)) {
-          ascii += ' ';
-          continue;
-        }
-      }
-
-      // 按顺序循环使用字符集中的字符，保证文本连续
-      const char = chars[charIndex % chars.length] || ' ';
-      charIndex++;
+      // 根据抖动后的灰度值选择字符
+      const ditheredGray = gray[y * width + x];
+      const charIndex = isBgLight
+        ? Math.floor((ditheredGray / 255) * (charLen - 1))
+        : Math.floor((1 - ditheredGray / 255) * (charLen - 1));
+      const char = sortedChars[Math.max(0, Math.min(charIndex, charLen - 1))];
 
       if (colored) {
-        ascii += `<span style="color:rgb(${r},${g},${b})">${char}</span>`;
+        ascii += `<span style="color:rgb(${data[i]},${data[i + 1]},${data[i + 2]})">${char}</span>`;
       } else {
         ascii += char;
       }

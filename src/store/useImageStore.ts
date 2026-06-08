@@ -21,6 +21,11 @@ export type CompressQuality = 'lossless' | 'high' | 'extreme' | 'custom';
 export type PixelStyle = 'pixel' | 'gameboy' | 'ascii-bw' | 'ascii-color';
 
 /**
+ * 像素化模式（拼豆算法）
+ */
+export type PixelateMode = 'photo' | 'simple' | 'illustration';
+
+/**
  * ASCII 字符集预设
  */
 export type AsciiPreset = 'default' | 'blocks' | 'symbols' | 'custom';
@@ -93,6 +98,8 @@ interface ImageState {
   pixelSize: number;
   /** 像素风格 */
   pixelStyle: PixelStyle;
+  /** 像素化模式 */
+  pixelateMode: PixelateMode;
   /** ASCII 字符集预设 */
   asciiPreset: AsciiPreset;
   /** 自定义 ASCII 字符集 */
@@ -127,6 +134,8 @@ interface ImageState {
   setPixelSize: (size: number) => void;
   /** 设置像素风格 */
   setPixelStyle: (style: PixelStyle) => void;
+  /** 设置像素化模式 */
+  setPixelateMode: (mode: PixelateMode) => void;
   /** 设置 ASCII 预设 */
   setAsciiPreset: (preset: AsciiPreset) => void;
   /** 设置自定义 ASCII 字符 */

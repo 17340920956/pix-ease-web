@@ -3,8 +3,8 @@ import { removeBackground, preload } from '@imgly/background-removal';
 let modelReady = false;
 let preloadPromise: Promise<void> | null = null;
 
-/** AI 处理的最大分辨率（提高以提升抠图质量） */
-const BG_REMOVE_MAX_DIM = 1024;
+/** AI 处理的最大分辨率（提高到 2048 以保留更多细节） */
+const BG_REMOVE_MAX_DIM = 2048;
 
 export async function initBackgroundRemoval(): Promise<void> {
   if (modelReady) return;
@@ -72,25 +72,27 @@ async function fetchBlob(url: string): Promise<Blob> {
 }
 
 /**
- * 高斯模糊 alpha 通道
+ * 可分离高斯模糊 alpha 通道（水平 + 垂直两遍）
  */
-function gaussianBlurAlpha(alpha: Uint8Array, w: number, h: number, sigma: number): Uint8Array {
-  const radius = Math.ceil(sigma * 3);
-  const out = new Uint8Array(alpha.length);
+function gaussianBlurAlpha(alpha: Uint8Array, w: number, h: number, sigma: number): Float64Array {
+  const radius = Math.max(1, Math.ceil(sigma * 3));
+  const out = new Float64Array(alpha.length);
   
-  const kernel: number[] = [];
+  const kernelSize = radius * 2 + 1;
+  const kernel = new Float64Array(kernelSize);
   let kernelSum = 0;
-  for (let i = -radius; i <= radius; i++) {
-    const v = Math.exp(-(i * i) / (2 * sigma * sigma));
-    kernel.push(v);
+  for (let i = 0; i < kernelSize; i++) {
+    const x = i - radius;
+    const v = Math.exp(-(x * x) / (2 * sigma * sigma));
+    kernel[i] = v;
     kernelSum += v;
   }
-  for (let i = 0; i < kernel.length; i++) {
+  for (let i = 0; i < kernelSize; i++) {
     kernel[i] /= kernelSum;
   }
   
   // 水平方向
-  const temp = new Float32Array(w * h);
+  const temp = new Float64Array(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       let sum = 0;
@@ -110,7 +112,7 @@ function gaussianBlurAlpha(alpha: Uint8Array, w: number, h: number, sigma: numbe
         const sy = Math.min(Math.max(y + k, 0), h - 1);
         sum += temp[sy * w + x] * kernel[k + radius];
       }
-      out[y * w + x] = Math.round(Math.max(0, Math.min(255, sum)));
+      out[y * w + x] = sum;
     }
   }
   
@@ -118,12 +120,126 @@ function gaussianBlurAlpha(alpha: Uint8Array, w: number, h: number, sigma: numbe
 }
 
 /**
- * 处理 AI 抠图的 alpha 掩码：
- * 1. 提取原始 alpha
- * 2. 极轻微高斯模糊（σ=0.5）去除毛刺
- * 3. 不做对比度增强，保留原始颜色
+ * 形态学腐蚀操作（缩小前景，消除小毛刺和孤立噪点）
+ * 对每个像素，取其 3x3 邻域内的最小值
  */
-function processAlphaMask(imageData: ImageData): Uint8Array {
+function erodeAlpha(alpha: Float64Array | Uint8Array, w: number, h: number, iterations: number): Float64Array {
+  let current = Float64Array.from(alpha);
+  
+  for (let iter = 0; iter < iterations; iter++) {
+    const next = new Float64Array(current.length);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let minVal = 255;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+              const val = current[ny * w + nx];
+              if (val < minVal) minVal = val;
+            }
+          }
+        }
+        next[y * w + x] = minVal;
+      }
+    }
+    current = next;
+  }
+  
+  return current;
+}
+
+/**
+ * 形态学膨胀操作（扩大前景，填充主体内部空洞）
+ * 对每个像素，取其 3x3 邻域内的最大值
+ */
+function dilateAlpha(alpha: Float64Array | Uint8Array, w: number, h: number, iterations: number): Float64Array {
+  let current = Float64Array.from(alpha);
+  
+  for (let iter = 0; iter < iterations; iter++) {
+    const next = new Float64Array(current.length);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let maxVal = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+              const val = current[ny * w + nx];
+              if (val > maxVal) maxVal = val;
+            }
+          }
+        }
+        next[y * w + x] = maxVal;
+      }
+    }
+    current = next;
+  }
+  
+  return current;
+}
+
+/**
+ * 从原图四角采样估算背景色
+ * 原理：大多数照片的四角通常是背景
+ * 量化到 8 的倍数以提高鲁棒性
+ */
+function sampleBgColorFromCorners(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  cornerSize: number = 10,
+): { r: number; g: number; b: number } {
+  let rSum = 0, gSum = 0, bSum = 0, count = 0;
+  
+  // 四个角采样
+  const corners = [
+    { x: 0, y: 0 },
+    { x: width - cornerSize, y: 0 },
+    { x: 0, y: height - cornerSize },
+    { x: width - cornerSize, y: height - cornerSize },
+  ];
+  
+  for (const corner of corners) {
+    for (let dy = 0; dy < cornerSize; dy++) {
+      for (let dx = 0; dx < cornerSize; dx++) {
+        const x = corner.x + dx;
+        const y = corner.y + dy;
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          const idx = (y * width + x) * 4;
+          rSum += Math.round(data[idx] / 8) * 8;
+          gSum += Math.round(data[idx + 1] / 8) * 8;
+          bSum += Math.round(data[idx + 2] / 8) * 8;
+          count++;
+        }
+      }
+    }
+  }
+  
+  return {
+    r: Math.round(rSum / count),
+    g: Math.round(gSum / count),
+    b: Math.round(bSum / count),
+  };
+}
+
+/**
+ * 优化后的 alpha 掩码处理流程：
+ * 1. 提取原始 alpha
+ * 2. 开运算（先腐蚀后膨胀）：消除边缘小毛刺和孤立噪点
+ * 3. 闭运算（先膨胀后腐蚀）：填充主体内部小空洞，修复粘连
+ * 4. 背景色清理：将接近背景色的像素 alpha 清零
+ *    - 更激进的清理策略：放宽邻域判断，更彻底地清理残留背景
+ * 5. 边缘清理：对图像边缘区域进行额外清理（边缘通常是背景）
+ * 6. 高斯模糊：使边缘平滑自然
+ * 7. Alpha 压缩：将接近 0 的值推向 0，增强背景干净度
+ */
+function processAlphaMask(
+  imageData: ImageData,
+  bgColor?: { r: number; g: number; b: number },
+): Uint8Array {
   const { data, width, height } = imageData;
   const len = width * height;
   const alpha = new Uint8Array(len);
@@ -132,9 +248,84 @@ function processAlphaMask(imageData: ImageData): Uint8Array {
     alpha[i] = data[i * 4 + 3];
   }
   
-  const smoothed = gaussianBlurAlpha(alpha, width, height, 0.5);
+  const bgThreshold = 50; // 与背景色的差异阈值
   
-  return smoothed;
+  // 步骤 1：开运算 - 消除毛刺和孤立噪点（腐蚀 1 次 + 膨胀 1 次）
+  let processed = erodeAlpha(alpha, width, height, 1);
+  processed = dilateAlpha(processed, width, height, 1);
+  
+  // 步骤 2：闭运算 - 填充主体内部空洞（膨胀 1 次 + 腐蚀 1 次）
+  processed = dilateAlpha(processed, width, height, 1);
+  processed = erodeAlpha(processed, width, height, 1);
+  
+  // 步骤 3：背景色清理 - 更激进的策略
+  // 判断依据：像素颜色接近背景色 且 周围有低 alpha 区域
+  if (bgColor) {
+    const neighborRadius = 2; // 减小半径（5x5），更彻底地清理边缘附近背景
+    const bgNeighborThreshold = 100; // 降低阈值，更激进地清理
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        const r = data[i * 4];
+        const g = data[i * 4 + 1];
+        const b = data[i * 4 + 2];
+        const colorDiff = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
+        
+        if (colorDiff < bgThreshold) {
+          // 计算 5x5 邻域内的最小 alpha 值
+          let minNeighborAlpha = 255;
+          for (let dy = -neighborRadius; dy <= neighborRadius; dy++) {
+            for (let dx = -neighborRadius; dx <= neighborRadius; dx++) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const val = processed[ny * width + nx];
+                if (val < minNeighborAlpha) minNeighborAlpha = val;
+              }
+            }
+          }
+          
+          // 如果邻域内有接近透明的像素，说明当前像素也应该是背景
+          if (minNeighborAlpha < 50) {
+            processed[i] = 0;
+          }
+        }
+      }
+    }
+  }
+  
+  // 步骤 4：边缘清理 - 图像边缘 5% 区域通常是背景
+  const edgeMargin = Math.max(3, Math.floor(Math.min(width, height) * 0.05));
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // 判断是否在边缘区域
+      const isEdge = x < edgeMargin || x >= width - edgeMargin || 
+                     y < edgeMargin || y >= height - edgeMargin;
+      if (isEdge && processed[y * width + x] < 80) {
+        processed[y * width + x] = 0;
+      }
+    }
+  }
+  
+  // 步骤 5：高斯模糊 - 使边缘平滑
+  processed = gaussianBlurAlpha(processed, width, height, 0.8);
+  
+  // 步骤 6：Alpha 压缩 - 更激进地将低 alpha 推向 0
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    let val = processed[i];
+    if (val < 0) val = 0;
+    if (val > 255) val = 255;
+    
+    // 更激进的 S 型曲线：增强背景干净度
+    const normalized = val / 255;
+    // 使用更陡峭的 sigmoid 曲线，让接近 0 的值更接近 0
+    const compressed = (Math.tanh((normalized - 0.4) * 8) + 1) / 2;
+    out[i] = Math.round(compressed * 255);
+  }
+  
+  return out;
 }
 
 export async function removeImageBackground(
@@ -153,6 +344,22 @@ export async function removeImageBackground(
 
     onProgress?.('正在预处理图片...');
     const { blob: resized } = await resizeImage(source, BG_REMOVE_MAX_DIM);
+
+    // 从原图四角采样背景色（在AI处理前）
+    const origImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('原图加载失败'));
+      img.src = URL.createObjectURL(resized);
+    });
+
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = origImg.width;
+    sampleCanvas.height = origImg.height;
+    const sampleCtx = sampleCanvas.getContext('2d')!;
+    sampleCtx.drawImage(origImg, 0, 0);
+    const origImageData = sampleCtx.getImageData(0, 0, origImg.width, origImg.height);
+    const bgColor = sampleBgColorFromCorners(origImageData.data, origImg.width, origImg.height);
 
     onProgress?.('AI 分析中...');
     const result = await removeBackground(resized, {
@@ -176,7 +383,7 @@ export async function removeImageBackground(
     ctx.drawImage(resultImg, 0, 0);
     const aiImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
-    const processedAlpha = processAlphaMask(aiImageData);
+    const processedAlpha = processAlphaMask(aiImageData, bgColor);
     
     for (let i = 0; i < processedAlpha.length; i++) {
       aiImageData.data[i * 4 + 3] = processedAlpha[i];

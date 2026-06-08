@@ -1,9 +1,8 @@
 'use client';
 
-import { memo, useRef, useState } from 'react';
+import { memo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Upload,
   Download,
   Grid3x3,
   ZoomIn,
@@ -28,7 +27,6 @@ interface TopMenuBarProps {
   onZoomOut: () => void;
   onClearCanvas: () => void;
   onExportPng: () => void;
-  onImportImage: (file: File) => void;
   onUndo: () => void;
   onRedo: () => void;
   onFlipHorizontal: () => void;
@@ -112,7 +110,6 @@ export default memo(function TopMenuBar({
   onZoomOut,
   onClearCanvas,
   onExportPng,
-  onImportImage,
   onUndo,
   onRedo,
   onFlipHorizontal,
@@ -120,8 +117,6 @@ export default memo(function TopMenuBar({
   onRotateClockwise,
   onRotateCounterClockwise,
 }: TopMenuBarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   return (
     <div
       className="flex items-center gap-0.5 px-2 py-1 flex-shrink-0 overflow-x-auto scrollbar-hide"
@@ -147,8 +142,6 @@ export default memo(function TopMenuBar({
 
       <div className="w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-color)' }} />
 
-      <ToolbarButton onClick={() => fileInputRef.current?.click()} label="导入图片"
-        icon={<Upload className="w-4 h-4" />} />
       <ToolbarButton onClick={onExportPng} label="导出 PNG"
         icon={<Download className="w-4 h-4" />} />
 
@@ -169,18 +162,6 @@ export default memo(function TopMenuBar({
         icon={<Trash2 className="w-4 h-4" />} />
 
       <div className="flex-1" />
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onImportImage(file);
-          e.target.value = '';
-        }}
-        className="hidden"
-      />
     </div>
   );
 });
